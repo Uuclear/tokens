@@ -41,6 +41,7 @@ Override any path with `tokens setup` or `tokens config` / `paths.<platform_id>`
 
 ## `tokens serve` on Unix
 
+- Default: `0.0.0.0:5790` (all interfaces; LAN access without extra flags)
 - Foreground: `tokens serve --foreground`
-- Background: daemon uses `process_group` + `SIGTERM`; same as Linux/macOS standard practice
+- Background: daemon uses `process_group` + `SIGTERM`; same on Linux and macOS
 - Stop: `tokens serve --down`

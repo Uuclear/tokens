@@ -20,7 +20,7 @@ impl Adapter for CursorAdapter {
     }
 
     fn probe(&self) -> Result<Vec<ProbeHit>> {
-        Ok(cursor_roots()
+        let mut hits: Vec<ProbeHit> = cursor_roots()
             .into_iter()
             .map(|r| ProbeHit {
                 path: r.path.display().to_string(),
@@ -28,7 +28,16 @@ impl Adapter for CursorAdapter {
                 size_bytes: std::fs::metadata(&r.path).ok().map(|m| m.len()),
                 note: Some(format!("surface={} kind={:?}", r.surface, r.kind)),
             })
-            .collect())
+            .collect();
+        hits.push(ProbeHit {
+            path: "cursor.com/api (WorkosCursorSessionToken)".into(),
+            exists: false,
+            size_bytes: None,
+            note: Some(
+                "exact usage via tokens config set cursor_session_token + scan --api (feature cursor_api)".into(),
+            ),
+        });
+        Ok(hits)
     }
 
     fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {

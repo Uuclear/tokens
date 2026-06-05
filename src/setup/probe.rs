@@ -1,5 +1,6 @@
 //! Probe default scan paths before interactive setup.
 
+use crate::adapters;
 use crate::registry::PlatformEntry;
 use crate::setup::defaults::default_paths_for;
 use std::path::PathBuf;
@@ -19,13 +20,21 @@ pub struct PlatformPathStatus {
 }
 
 pub fn probe_platform(platform: &PlatformEntry) -> PlatformPathStatus {
-    let paths: Vec<PathStatus> = default_paths_for(platform)
-        .into_iter()
-        .map(|path| PathStatus {
-            exists: path.exists(),
-            path,
-        })
-        .collect();
+    let paths: Vec<PathStatus> = if let Some(adapter) = adapters::adapter_by_id(&platform.id) {
+        adapter
+            .probe()
+            .map(|hits| {
+                hits.into_iter()
+                    .map(|hit| PathStatus {
+                        path: PathBuf::from(hit.path),
+                        exists: hit.exists,
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|_| probe_registry_paths(platform))
+    } else {
+        probe_registry_paths(platform)
+    };
     let any_exists = paths.iter().any(|p| p.exists);
     PlatformPathStatus {
         platform_id: platform.id.clone(),
@@ -33,6 +42,16 @@ pub fn probe_platform(platform: &PlatformEntry) -> PlatformPathStatus {
         paths,
         any_exists,
     }
+}
+
+fn probe_registry_paths(platform: &PlatformEntry) -> Vec<PathStatus> {
+    default_paths_for(platform)
+        .into_iter()
+        .map(|path| PathStatus {
+            exists: path.exists(),
+            path,
+        })
+        .collect()
 }
 
 pub fn probe_all(platforms: &[&PlatformEntry]) -> Vec<PlatformPathStatus> {

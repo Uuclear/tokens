@@ -92,7 +92,7 @@ cargo run -- serve --dev --pixel
 | macOS | `~/Library/Application Support/tokens/` |
 | Linux | `~/.config/tokens/` |
 
-`serve` runs a background daemon (default `127.0.0.1:5790`), rescans every 5 minutes, and serves bundled offline logos. Use `--host 0.0.0.0` to listen on all interfaces (LAN/public; no auth).
+`serve` runs a background daemon (default `0.0.0.0:5790`), rescans every 5 minutes, and serves bundled offline logos. Listens on all interfaces for LAN access (no auth).
 
 ### macOS & Linux paths
 

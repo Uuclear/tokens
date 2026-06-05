@@ -10,8 +10,7 @@ use crate::paths::user_config::{self, UserPathConfig};
 use crate::registry::PlatformRegistry;
 use anyhow::{Context, Result};
 use axum::Router;
-use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,16 +18,17 @@ use tokio::signal;
 use theme::UiTheme;
 use web::AppState;
 
+/// Dashboard listens on all interfaces so LAN/public access works without extra flags.
+const LISTEN_HOST: IpAddr = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+
 pub fn run_serve(
     db_path: PathBuf,
-    host: &str,
     port: u16,
     down: bool,
     foreground: bool,
     dev: bool,
     ui: UiTheme,
 ) -> Result<()> {
-    let host = parse_listen_host(host)?;
     if down {
         return daemon::stop();
     }
@@ -36,13 +36,9 @@ pub fn run_serve(
         anyhow::bail!("--dev 需与 --foreground 一起使用（在仓库根目录前台运行）");
     }
     if !foreground {
-        return daemon::start_background(host, port, ui);
+        return daemon::start_background(port, ui);
     }
-    run_foreground_server(db_path, host, port, ui, dev)
-}
-
-fn parse_listen_host(host: &str) -> Result<IpAddr> {
-    IpAddr::from_str(host).with_context(|| format!("无效监听地址: {host}"))
+    run_foreground_server(db_path, LISTEN_HOST, port, ui, dev)
 }
 
 fn print_listen_urls(host: IpAddr, port: u16) {

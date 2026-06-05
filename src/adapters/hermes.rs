@@ -14,12 +14,13 @@ impl Adapter for HermesAdapter {
     }
 
     fn probe(&self) -> Result<Vec<ProbeHit>> {
-        let db = hermes_home().join("state.db");
+        let home = hermes_home();
+        let db = home.join("state.db");
         Ok(vec![ProbeHit {
             path: db.display().to_string(),
             exists: db.exists(),
             size_bytes: std::fs::metadata(&db).ok().map(|m| m.len()),
-            note: Some("messages table with input_tokens/output_tokens".into()),
+            note: Some("sessions table with per-session token totals".into()),
         }])
     }
 
@@ -40,46 +41,47 @@ fn scan_hermes_db(db_path: &PathBuf, ingested_at: i64) -> Result<Vec<UsageEvent>
     let source = db_path.display().to_string();
     let mut events = Vec::new();
 
-    let sql_variants = [
-        "SELECT id, session_id, model, input_tokens, output_tokens, created_at FROM messages WHERE input_tokens > 0 OR output_tokens > 0",
-        "SELECT rowid, session_id, model, prompt_tokens, completion_tokens, timestamp FROM messages WHERE prompt_tokens > 0 OR completion_tokens > 0",
-    ];
-    for sql in sql_variants {
-        if let Ok(mut stmt) = conn.prepare(sql) {
-            let mapped = stmt.query_map([], |row| {
-                let id: i64 = row.get(0)?;
-                let session_id: String = row.get::<_, Option<String>>(1)?.unwrap_or_else(|| "default".into());
-                let model: Option<String> = row.get(2).ok();
-                let input: i64 = row.get(3)?;
-                let output: i64 = row.get(4)?;
-                let ts: Option<i64> = row.get(5).ok();
-                Ok((id, session_id, model, input, output, ts))
-            });
-            if let Ok(rows) = mapped {
-                for row in rows.flatten() {
-                    let (id, session_id, model, input, output, ts) = row;
-                    let mut ev = UsageEvent::new_base(
-                        "hermes",
-                        PlatformKind::Cli,
-                        &session_id,
-                        &source,
-                        ingested_at,
-                    );
-                    ev.id = make_event_id("hermes", &format!("{source}:{id}"));
-                    ev.call_id = Some(id.to_string());
-                    ev.ts = ts.unwrap_or(ingested_at);
-                    ev.model = model;
-                    ev.input_tokens = input;
-                    ev.output_tokens = output;
-                    ev.quality = UsageQuality::Exact;
-                    ev.compute_total();
-                    events.push(ev);
-                }
-                if !events.is_empty() {
-                    return Ok(events);
-                }
-            }
-        }
+    let sql = "SELECT id, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, started_at \
+               FROM sessions \
+               WHERE input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR cache_write_tokens > 0 OR reasoning_tokens > 0";
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let model: Option<String> = row.get(1).ok();
+        let input: i64 = row.get(2)?;
+        let output: i64 = row.get(3)?;
+        let cache_read: i64 = row.get(4)?;
+        let cache_write: i64 = row.get(5)?;
+        let reasoning: i64 = row.get(6)?;
+        let ts: Option<f64> = row.get(7).ok();
+        Ok((id, model, input, output, cache_read, cache_write, reasoning, ts))
+    })?;
+
+    for row in rows.flatten() {
+        let (id, model, input, output, cache_read, cache_write, reasoning, ts) = row;
+        let mut ev = UsageEvent::new_base(
+            "hermes",
+            PlatformKind::Cli,
+            &id,
+            &source,
+            ingested_at,
+        );
+        ev.id = make_event_id("hermes", &format!("{source}:{id}"));
+        ev.call_id = Some(id.clone());
+        ev.surface = Some("cli".into());
+        ev.ts = ts
+            .map(|t| (t * 1000.0) as i64)
+            .unwrap_or(ingested_at);
+        ev.model = model;
+        ev.input_tokens = input;
+        ev.output_tokens = output;
+        ev.cache_read_tokens = cache_read;
+        ev.cache_write_tokens = cache_write;
+        ev.reasoning_tokens = reasoning;
+        ev.quality = UsageQuality::Exact;
+        ev.compute_total();
+        events.push(ev);
     }
+
     Ok(events)
 }

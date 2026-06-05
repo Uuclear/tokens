@@ -150,6 +150,14 @@ pub fn qwen_projects_dir() -> PathBuf {
     })
 }
 
+pub fn pi_sessions_dir() -> PathBuf {
+    first_override_or("pi", || {
+        std::env::var("PI_AGENT_HOME")
+            .map(|p| std::path::PathBuf::from(p).join("sessions"))
+            .unwrap_or_else(|_| host::pi_sessions_dir())
+    })
+}
+
 pub fn cursor_global_storage() -> PathBuf {
     host::cursor_ide_state_db()
 }
@@ -195,6 +203,7 @@ mod tests {
             "%HOME%/.hermes",
             "%HOME%/.cline/data",
             "%HOME%/.qwen/projects",
+            "%HOME%/.pi/agent/sessions",
             "%XDG_DATA_HOME%/opencode",
         ] {
             let p = expand_path_template(template);

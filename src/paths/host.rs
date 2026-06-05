@@ -84,6 +84,16 @@ pub fn cursor_cli_home() -> PathBuf {
     user_home().join(".cursor")
 }
 
+/// Pi Coding Agent session logs (`@earendil-works/pi-coding-agent`).
+pub fn pi_sessions_dir() -> PathBuf {
+    user_home().join(".pi").join("agent").join("sessions")
+}
+
+/// Cursor web session cookie file (`WorkosCursorSessionToken` alternative store).
+pub fn cursor_auth_json() -> PathBuf {
+    app_config_dir().join("cursor").join("auth.json")
+}
+
 /// Kilo CLI SQLite (XDG / `.local/share`).
 pub fn kilo_cli_db_candidates() -> Vec<PathBuf> {
     vec![
@@ -135,7 +145,7 @@ pub fn chatbox_root() -> PathBuf {
     first_existing(&chatbox_roots()).unwrap_or_else(|| chatbox_roots()[0].clone())
 }
 
-/// OpenCode data directory candidates (XDG + legacy).
+/// OpenCode data directory candidates (XDG data only — not npm install trees).
 pub fn opencode_data_dir_candidates() -> Vec<PathBuf> {
     let mut v = vec![
         xdg_data_home().join("opencode"),
@@ -147,8 +157,6 @@ pub fn opencode_data_dir_candidates() -> Vec<PathBuf> {
     if let Ok(local) = env::var("LOCALAPPDATA") {
         v.push(PathBuf::from(local).join("opencode"));
     }
-    let app = app_config_dir();
-    v.push(app.join("opencode"));
     let mut unique = Vec::new();
     for p in v {
         if !unique.iter().any(|u| u == &p) {
@@ -156,6 +164,14 @@ pub fn opencode_data_dir_candidates() -> Vec<PathBuf> {
         }
     }
     unique
+}
+
+/// Directories that contain an OpenCode SQLite database.
+pub fn opencode_data_dirs_with_db() -> Vec<PathBuf> {
+    opencode_data_dir_candidates()
+        .into_iter()
+        .filter(|p| p.join("opencode.db").exists())
+        .collect()
 }
 
 #[cfg(target_os = "macos")]

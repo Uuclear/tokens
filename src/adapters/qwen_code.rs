@@ -20,7 +20,7 @@ impl Adapter for QwenCodeAdapter {
             path: dir.display().to_string(),
             exists: dir.exists(),
             size_bytes: None,
-            note: Some("~/.qwen/projects session files".into()),
+            note: Some("~/.qwen/projects — chats/*.jsonl with usageMetadata".into()),
         }])
     }
 
@@ -46,23 +46,28 @@ impl Adapter for QwenCodeAdapter {
             if path.extension().is_some_and(|x| x == "jsonl") {
                 for (i, line) in content.lines().enumerate() {
                     if let Ok(v) = serde_json::from_str::<Value>(line) {
-                        if let Some(ev) = extract_usage(&v, path, &format!("line-{i}"), ingested_at)
-                        {
+                        let fallback_id = format!("line-{i}");
+                        let session_id = v
+                            .get("sessionId")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or(fallback_id.as_str());
+                        if let Some(ev) = extract_usage(&v, path, session_id, ingested_at, i) {
                             events.push(ev);
                         }
                     }
                 }
             } else if let Ok(v) = serde_json::from_str::<Value>(&content) {
-                if let Some(ev) = extract_usage(&v, path, "file", ingested_at) {
+                if let Some(ev) = extract_usage(&v, path, "file", ingested_at, 0) {
                     events.push(ev);
                 }
-                // Nested stats from CLI output format
                 if let Some(usage) = v.pointer("/usage") {
                     if let Some(ev) = extract_usage_from_usage_obj(
                         usage,
                         path,
                         v.get("sessionId").and_then(|s| s.as_str()).unwrap_or("file"),
                         ingested_at,
+                        None,
+                        0,
                     ) {
                         events.push(ev);
                     }
@@ -76,21 +81,87 @@ impl Adapter for QwenCodeAdapter {
 fn extract_usage(
     v: &Value,
     path: &std::path::Path,
-    suffix: &str,
+    session_id: &str,
     ingested_at: i64,
+    line_idx: usize,
 ) -> Option<UsageEvent> {
-    let usage = v
+    if let Some(usage) = v
         .get("usage")
         .or_else(|| v.pointer("/stats/usage"))
-        .or_else(|| v.get("tokenUsage"))?;
-    extract_usage_from_usage_obj(
-        usage,
-        path,
-        v.get("sessionId")
-            .and_then(|s| s.as_str())
-            .unwrap_or(suffix),
-        ingested_at,
-    )
+        .or_else(|| v.get("tokenUsage"))
+    {
+        return extract_usage_from_usage_obj(
+            usage,
+            path,
+            session_id,
+            ingested_at,
+            v.get("model").and_then(|m| m.as_str()),
+            line_idx,
+        );
+    }
+    if let Some(meta) = v.get("usageMetadata") {
+        return extract_usage_from_metadata(
+            meta,
+            path,
+            session_id,
+            ingested_at,
+            v.get("model").and_then(|m| m.as_str()),
+            line_idx,
+        );
+    }
+    None
+}
+
+fn extract_usage_from_metadata(
+    meta: &Value,
+    path: &std::path::Path,
+    session_id: &str,
+    ingested_at: i64,
+    model: Option<&str>,
+    line_idx: usize,
+) -> Option<UsageEvent> {
+    let input = meta
+        .get("promptTokenCount")
+        .or_else(|| meta.get("inputTokens"))
+        .or_else(|| meta.get("input_tokens"))
+        .and_then(|x| x.as_i64())
+        .unwrap_or(0);
+    let output = meta
+        .get("candidatesTokenCount")
+        .or_else(|| meta.get("responseTokenCount"))
+        .or_else(|| meta.get("outputTokens"))
+        .or_else(|| meta.get("output_tokens"))
+        .and_then(|x| x.as_i64())
+        .unwrap_or(0);
+    let reasoning = meta
+        .get("thoughtsTokenCount")
+        .or_else(|| meta.get("reasoning_tokens"))
+        .and_then(|x| x.as_i64())
+        .unwrap_or(0);
+    let cache_read = meta
+        .get("cachedContentTokenCount")
+        .or_else(|| meta.get("cache_read_tokens"))
+        .and_then(|x| x.as_i64())
+        .unwrap_or(0);
+    if input == 0 && output == 0 && reasoning == 0 && cache_read == 0 {
+        return None;
+    }
+    let source = path.display().to_string();
+    let mut ev =
+        UsageEvent::new_base("qwen_code", PlatformKind::Cli, session_id, &source, ingested_at);
+    ev.id = make_event_id(
+        "qwen_code",
+        &format!("{source}:{session_id}:{line_idx}:{input}:{output}"),
+    );
+    ev.call_id = Some(format!("{session_id}:{line_idx}"));
+    ev.input_tokens = input;
+    ev.output_tokens = output;
+    ev.reasoning_tokens = reasoning;
+    ev.cache_read_tokens = cache_read;
+    ev.model = model.map(String::from);
+    ev.quality = UsageQuality::Exact;
+    ev.compute_total();
+    Some(ev)
 }
 
 fn extract_usage_from_usage_obj(
@@ -98,6 +169,8 @@ fn extract_usage_from_usage_obj(
     path: &std::path::Path,
     session_id: &str,
     ingested_at: i64,
+    model: Option<&str>,
+    line_idx: usize,
 ) -> Option<UsageEvent> {
     let input = usage
         .get("inputTokens")
@@ -117,14 +190,37 @@ fn extract_usage_from_usage_obj(
     let source = path.display().to_string();
     let mut ev =
         UsageEvent::new_base("qwen_code", PlatformKind::Cli, session_id, &source, ingested_at);
-    ev.id = make_event_id("qwen_code", &format!("{source}:{session_id}:{input}:{output}"));
+    ev.id = make_event_id(
+        "qwen_code",
+        &format!("{source}:{session_id}:{line_idx}:{input}:{output}"),
+    );
+    ev.call_id = Some(format!("{session_id}:{line_idx}"));
     ev.input_tokens = input;
     ev.output_tokens = output;
-    ev.model = usage
-        .get("model")
-        .and_then(|m| m.as_str())
-        .map(String::from);
+    ev.model = model
+        .map(String::from)
+        .or_else(|| usage.get("model").and_then(|m| m.as_str()).map(String::from));
     ev.quality = UsageQuality::Exact;
     ev.compute_total();
     Some(ev)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn parses_usage_metadata() {
+        let v: Value = serde_json::from_str(
+            r#"{"sessionId":"s1","model":"qwen3","usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"thoughtsTokenCount":5,"cachedContentTokenCount":10}}"#,
+        )
+        .unwrap();
+        let ev = extract_usage(&v, Path::new("/tmp/chat.jsonl"), "s1", 0, 0).unwrap();
+        assert_eq!(ev.input_tokens, 100);
+        assert_eq!(ev.output_tokens, 20);
+        assert_eq!(ev.reasoning_tokens, 5);
+        assert_eq!(ev.cache_read_tokens, 10);
+        assert_eq!(ev.total_tokens, 135);
+    }
 }

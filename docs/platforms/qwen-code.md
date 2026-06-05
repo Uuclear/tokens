@@ -5,13 +5,14 @@
 
 ## Paths
 
-- `%USERPROFILE%\.qwen\projects\**\*` (JSON / JSONL session files)
+- `%HOME%/.qwen/projects/**/*` (JSON / JSONL under `chats/` etc.)
 
 ## Fields
 
-- `usage.inputTokens` / `outputTokens` (CLI `--output-format json`)
-- Interactive `/stats` for session totals (reference schema)
+- `usageMetadata` on assistant turns (primary):
+  - `promptTokenCount`, `candidatesTokenCount`, `thoughtsTokenCount`, `cachedContentTokenCount`
+- Legacy: `usage.inputTokens` / `outputTokens` (CLI `--output-format json`)
 
 ## Quality
 
-`exact` when logs contain usage; otherwise skipped
+`exact` when logs contain usage metadata

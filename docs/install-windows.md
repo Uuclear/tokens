@@ -68,7 +68,7 @@ tokens probe cursor          # 查看 Cursor 数据路径
 ## 4. Web 监控面板
 
 ```powershell
-tokens serve                 # 后台启动，默认 http://127.0.0.1:5790/
+tokens serve                 # 后台启动，默认 http://0.0.0.0:5790/
 tokens serve --pixel         # 像素 / 墨水屏主题
 tokens serve --list-themes   # 列出全部 UI 主题
 tokens serve --down          # 停止后台服务

@@ -76,14 +76,8 @@ pub enum Commands {
         #[arg(long, help = "Reset to default paths, enable all platforms, and scan")]
         init: bool,
     },
-    /// Web monitoring dashboard (background daemon on port 5790 by default)
+    /// Web monitoring dashboard (background daemon on 0.0.0.0:5790 by default)
     Serve {
-        #[arg(
-            long,
-            default_value = "127.0.0.1",
-            help = "HTTP listen address (use 0.0.0.0 for LAN/public access)"
-        )]
-        host: String,
         #[arg(long, default_value_t = 5790, help = "HTTP listen port")]
         port: u16,
         #[arg(long, help = "Stop the background server")]
@@ -125,7 +119,6 @@ pub fn run() -> Result<()> {
 
     match cli.command {
         Commands::Serve {
-            host,
             port,
             down,
             foreground,
@@ -142,7 +135,7 @@ pub fn run() -> Result<()> {
             }
             let ui = crate::serve::theme::UiTheme::resolve(pixel, terminal, ink, paper)?;
             let foreground = foreground || dev;
-            return crate::serve::run_serve(db_path, &host, port, down, foreground, dev, ui);
+            return crate::serve::run_serve(db_path, port, down, foreground, dev, ui);
         }
         Commands::ListPlatforms => cmd_list_platforms(&registry),
         Commands::Probe { platform } => cmd_probe(&platform, &registry),

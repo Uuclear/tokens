@@ -35,6 +35,10 @@ pub fn platform_brand(id: &str) -> PlatformBrand {
             badge: "◆",
             ansi: "\x1b[38;5;33m",
         },
+        "pi" => PlatformBrand {
+            badge: "π",
+            ansi: "\x1b[38;5;177m",
+        },
         "cline" => PlatformBrand {
             badge: "◆",
             ansi: "\x1b[38;5;51m",
@@ -80,6 +84,7 @@ pub fn platform_hex(id: &str) -> &'static str {
         "openclaw" => "#fb7185",
         "hermes" => "#facc15",
         "qwen_code" => "#60a5fa",
+        "pi" => "#c084fc",
         "cline" => "#22d3ee",
         "kilo_cli" | "kilo_ide" => "#e879f9",
         "cherry_studio" => "#f43f5e",

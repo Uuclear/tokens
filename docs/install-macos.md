@@ -75,16 +75,61 @@ tokens doctor
 ## 5. Web 监控面板
 
 ```bash
-tokens serve
-tokens serve --paper
+tokens serve              # 后台 http://0.0.0.0:5790/（监听所有网卡）
+tokens serve --paper      # 暖色纸张主题
+tokens serve --list-themes
 tokens serve --down
 ```
+
+局域网访问示例（假设本机 IP 为 `192.168.1.10`）：
+
+```bash
+tokens serve --down
+tokens serve
+# 浏览器打开 http://192.168.1.10:5790/
+```
+
+面板无鉴权，请勿直接暴露到公网；若需远程访问请自行配置防火墙或反向代理。
 
 开发模式（在克隆的仓库根目录）：
 
 ```bash
 cargo run -- serve --dev --pixel
 ```
+
+### launchd 用户服务（可选）
+
+创建 `~/Library/LaunchAgents/com.tokens.serve.plist`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tokens.serve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/tokens</string>
+    <string>serve</string>
+    <string>--foreground</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>
+```
+
+加载：
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.tokens.serve.plist
+launchctl unload ~/Library/LaunchAgents/com.tokens.serve.plist   # 停止
+```
+
+注意：默认 `serve` 已自带后台模式；若用 `--foreground` 则由 launchd 管理进程。
 
 ## 6. 常见问题
 

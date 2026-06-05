@@ -5,7 +5,7 @@
 
 ## Paths
 
-- `%USERPROFILE%\.hermes\state.db`
+- `%USERPROFILE%\.hermes\state.db` (`sessions` table — per-session token totals)
 - Override: `HERMES_HOME`
 
 ## Fields

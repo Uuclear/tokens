@@ -9,9 +9,6 @@ $primary = @{
   claude_code = "https://claude.ai/images/claude_app_icon.png"
   cursor      = "https://www.cursor.com/apple-touch-icon.png"
   opencode    = "https://opencode.ai/favicon.ico"
-  hermes      = "https://www.nousresearch.com/favicon.ico"
-  chatbox     = "https://chatboxai.app/favicon.ico"
-  postman     = "https://www.postman.com/favicon.ico"
 }
 
 $google = @{
@@ -23,6 +20,10 @@ $google = @{
   qoder          = "qoder.com"
   cline          = "cline.bot"
   kilo_cli       = "kilocode.ai"
+  hermes         = "nousresearch.com"
+  chatbox        = "chatboxai.app"
+  postman        = "postman.com"
+  pi             = "pi.dev"
 }
 
 foreach ($k in $primary.Keys) {
@@ -40,6 +41,21 @@ foreach ($k in $google.Keys) {
 }
 
 Copy-Item (Join-Path $dir "kilo_cli.png") (Join-Path $dir "kilo_ide.png") -Force -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $dir "qoder.png") (Join-Path $dir "qoder_cn.png") -Force -ErrorAction SilentlyContinue
+foreach ($ico in @("opencode", "chatbox")) {
+  $src = Join-Path $dir "$ico.ico"
+  $dst = Join-Path $dir "$ico.png"
+  if (Test-Path $src) {
+    try {
+      Add-Type -AssemblyName System.Drawing
+      $bmp = [System.Drawing.Icon]::ExtractAssociatedIcon($src).ToBitmap()
+      $bmp.Save($dst, [System.Drawing.Imaging.ImageFormat]::Png)
+      $bmp.Dispose()
+    } catch {
+      Write-Host "skip $ico ico->png: $_"
+    }
+  }
+}
 Write-Host "Generating theme logos..."
 Push-Location (Join-Path $PSScriptRoot "..")
 cargo run --bin generate_theme_logos --features logo-gen

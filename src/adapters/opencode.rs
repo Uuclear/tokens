@@ -10,6 +10,15 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// Tables that mirror message token data and must not be scanned again.
+const SKIP_DYNAMIC_TABLES: &[&str] = &[
+    "part",
+    "__drizzle_migrations",
+    "migration",
+    "data_migration",
+    "sqlite_sequence",
+];
+
 pub struct OpenCodeAdapter;
 
 impl Adapter for OpenCodeAdapter {
@@ -30,10 +39,17 @@ impl Adapter for OpenCodeAdapter {
                 None
             };
             hits.push(ProbeHit {
-                path: base.display().to_string(),
-                exists: base.exists(),
+                path: db.display().to_string(),
+                exists: db.exists(),
                 size_bytes: fs::metadata(&db).ok().map(|m| m.len()),
-                note,
+                note: if db.exists() {
+                    note
+                } else {
+                    Some(format!(
+                        "no opencode.db in {} (install-only dir?)",
+                        base.display()
+                    ))
+                },
             });
         }
         Ok(hits)
@@ -64,9 +80,15 @@ fn scan_sqlite(db_path: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<
     }
     let conn = open_foreign_db(db_path)?;
     let source = db_path.display().to_string();
-    let mut events = Vec::new();
 
-    // Known OpenCode 1.2+ queries
+    // OpenCode 1.2+: message.data JSON with nested tokens.cache
+    if let Ok(events) = scan_message_data_table(&conn, &source, ingested_at) {
+        if !events.is_empty() {
+            return Ok(events);
+        }
+    }
+
+    // Older schemas with a dedicated tokens column
     let fixed_queries = [
         "SELECT id, session_id, provider_id, model_id, tokens, cost, time_created FROM message WHERE tokens IS NOT NULL",
         "SELECT id, sessionID, providerID, modelID, tokens, cost, created_at FROM messages WHERE tokens IS NOT NULL",
@@ -74,6 +96,7 @@ fn scan_sqlite(db_path: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<
     ];
     for sql in fixed_queries {
         if let Ok(mut stmt) = conn.prepare(sql) {
+            let mut events = Vec::new();
             if let Ok(rows) = stmt.query_map([], |row| {
                 let id: String = row.get(0)?;
                 let session_id: String = row.get(1)?;
@@ -96,12 +119,99 @@ fn scan_sqlite(db_path: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<
         }
     }
 
-    // Schema discovery: scan all tables for JSON token blobs
+    // Last resort: schema discovery (skip mirrored part rows)
+    let mut events = Vec::new();
     for table in list_tables(&conn)? {
+        if SKIP_DYNAMIC_TABLES.contains(&table.as_str()) {
+            continue;
+        }
         let cols = table_columns(&conn, &table)?;
         events.extend(scan_table_dynamic(&conn, &table, &cols, &source, ingested_at)?);
     }
     Ok(events)
+}
+
+fn scan_message_data_table(
+    conn: &Connection,
+    source: &str,
+    ingested_at: i64,
+) -> Result<Vec<UsageEvent>> {
+    let sql = "SELECT id, session_id, data, time_created FROM message";
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let session_id: String = row.get(1)?;
+        let data: String = row.get(2)?;
+        let ts: Option<i64> = row.get(3).ok();
+        Ok((id, session_id, data, ts))
+    })?;
+
+    let mut events = Vec::new();
+    for row in rows.flatten() {
+        let (id, session_id, data, ts) = row;
+        let Ok(v) = serde_json::from_str::<Value>(&data) else {
+            continue;
+        };
+        if let Some(ev) = parse_opencode_payload(&v, &id, &session_id, ts, source, ingested_at) {
+            events.push(ev);
+        }
+    }
+    Ok(events)
+}
+
+fn parse_opencode_tokens(tokens: &Value) -> Option<(i64, i64, i64, i64, i64)> {
+    let input = tokens.get("input").and_then(|x| x.as_i64()).unwrap_or(0);
+    let output = tokens.get("output").and_then(|x| x.as_i64()).unwrap_or(0);
+    let reasoning = tokens.get("reasoning").and_then(|x| x.as_i64()).unwrap_or(0);
+    let cache = tokens.get("cache").and_then(|x| x.as_object());
+    let cache_read = cache
+        .and_then(|c| c.get("read"))
+        .and_then(|x| x.as_i64())
+        .unwrap_or(0);
+    let cache_write = cache
+        .and_then(|c| c.get("write"))
+        .and_then(|x| x.as_i64())
+        .unwrap_or(0);
+    if input == 0 && output == 0 && cache_read == 0 && cache_write == 0 && reasoning == 0 {
+        return None;
+    }
+    Some((input, output, cache_read, cache_write, reasoning))
+}
+
+fn parse_opencode_payload(
+    v: &Value,
+    id: &str,
+    session_id: &str,
+    ts: Option<i64>,
+    source: &str,
+    ingested_at: i64,
+) -> Option<UsageEvent> {
+    let tokens = v.get("tokens")?;
+    let (input, output, cache_read, cache_write, reasoning) = parse_opencode_tokens(tokens)?;
+    let mut ev = UsageEvent::new_base("opencode", PlatformKind::Cli, session_id, source, ingested_at);
+    ev.id = make_event_id("opencode", &format!("{source}:{id}"));
+    ev.call_id = Some(id.to_string());
+    ev.surface = Some("cli".into());
+    ev.ts = ts.unwrap_or(ingested_at);
+    ev.provider = v
+        .get("providerID")
+        .or_else(|| v.get("provider_id"))
+        .and_then(|x| x.as_str())
+        .map(String::from);
+    ev.model = v
+        .get("modelID")
+        .or_else(|| v.get("model_id"))
+        .and_then(|x| x.as_str())
+        .map(String::from);
+    ev.input_tokens = input;
+    ev.output_tokens = output;
+    ev.cache_read_tokens = cache_read;
+    ev.cache_write_tokens = cache_write;
+    ev.reasoning_tokens = reasoning;
+    ev.cost_usd = v.get("cost").and_then(|x| x.as_f64());
+    ev.quality = UsageQuality::Exact;
+    ev.compute_total();
+    Some(ev)
 }
 
 fn scan_table_dynamic(
@@ -128,7 +238,7 @@ fn scan_table_dynamic(
         .collect::<Vec<_>>()
         .join(", ");
     let col_names: Vec<String> = cols.to_vec();
-    let sql = format!("SELECT {col_list} FROM \"{table}\" LIMIT 10000");
+    let sql = format!("SELECT {col_list} FROM \"{table}\"");
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([], |row| {
         let mut vals = Vec::new();
@@ -157,66 +267,48 @@ fn parse_cell_as_usage(
     ingested_at: i64,
 ) -> Option<UsageEvent> {
     let v: Value = serde_json::from_str(cell).ok()?;
-    let tokens = v.get("tokens").or_else(|| v.pointer("/usage"))?;
-    let input = tokens
-        .get("input")
-        .or_else(|| tokens.get("input_tokens"))
-        .and_then(|x| x.as_i64())
-        .unwrap_or(0);
-    let output = tokens
-        .get("output")
-        .or_else(|| tokens.get("output_tokens"))
-        .and_then(|x| x.as_i64())
-        .unwrap_or(0);
-    if input == 0 && output == 0 {
-        // nested search one level
-        if let Some(obj) = v.as_object() {
-            for val in obj.values() {
-                if let Some(ev) = parse_cell_as_usage(
-                    &val.to_string(),
-                    table,
-                    col,
-                    idx,
-                    source,
-                    ingested_at,
-                ) {
-                    return Some(ev);
-                }
-            }
+    if let Some(tokens) = v.get("tokens") {
+        if let Some((input, output, cache_read, cache_write, reasoning)) =
+            parse_opencode_tokens(tokens)
+        {
+            let session_id = v
+                .get("sessionID")
+                .or_else(|| v.get("session_id"))
+                .and_then(|x| x.as_str())
+                .map(String::from)
+                .unwrap_or_else(|| format!("{table}-{idx}"));
+            let id = v
+                .get("id")
+                .and_then(|x| x.as_str())
+                .map(String::from)
+                .unwrap_or_else(|| format!("{idx}"));
+            let mut ev =
+                UsageEvent::new_base("opencode", PlatformKind::Cli, &session_id, source, ingested_at);
+            ev.id = make_event_id("opencode", &format!("{source}:{table}:{id}"));
+            ev.call_id = Some(id);
+            ev.surface = Some("cli".into());
+            ev.provider = v
+                .get("providerID")
+                .or_else(|| v.get("provider_id"))
+                .and_then(|x| x.as_str())
+                .map(String::from);
+            ev.model = v
+                .get("modelID")
+                .or_else(|| v.get("model_id"))
+                .and_then(|x| x.as_str())
+                .map(String::from);
+            ev.input_tokens = input;
+            ev.output_tokens = output;
+            ev.cache_read_tokens = cache_read;
+            ev.cache_write_tokens = cache_write;
+            ev.reasoning_tokens = reasoning;
+            ev.cost_usd = v.get("cost").and_then(|x| x.as_f64());
+            ev.quality = UsageQuality::Exact;
+            ev.compute_total();
+            return Some(ev);
         }
-        return None;
     }
-    let session_id = v
-        .get("sessionID")
-        .or_else(|| v.get("session_id"))
-        .and_then(|x| x.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| format!("{table}-{idx}"));
-    let id = v
-        .get("id")
-        .and_then(|x| x.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| format!("{idx}"));
-    let mut ev = UsageEvent::new_base("opencode", PlatformKind::Cli, &session_id, source, ingested_at);
-    ev.id = make_event_id("opencode", &format!("{source}:{table}:{id}"));
-    ev.surface = Some("cli".into());
-    ev.call_id = Some(id.to_string());
-    ev.provider = v
-        .get("providerID")
-        .or_else(|| v.get("provider_id"))
-        .and_then(|x| x.as_str())
-        .map(String::from);
-    ev.model = v
-        .get("modelID")
-        .or_else(|| v.get("model_id"))
-        .and_then(|x| x.as_str())
-        .map(String::from);
-    ev.input_tokens = input;
-    ev.output_tokens = output;
-    ev.cost_usd = v.get("cost").and_then(|x| x.as_f64());
-    ev.quality = UsageQuality::Exact;
-    ev.compute_total();
-    Some(ev)
+    None
 }
 
 type MessageRow = (
@@ -236,11 +328,7 @@ fn parse_message_row(
 ) -> Option<UsageEvent> {
     let (id, session_id, provider, model, tokens_json, cost, ts) = row;
     let tokens: Value = serde_json::from_str(&tokens_json).ok()?;
-    let input = tokens.get("input").and_then(|x| x.as_i64()).unwrap_or(0);
-    let output = tokens.get("output").and_then(|x| x.as_i64()).unwrap_or(0);
-    if input == 0 && output == 0 {
-        return None;
-    }
+    let (input, output, cache_read, cache_write, reasoning) = parse_opencode_tokens(&tokens)?;
     let mut ev = UsageEvent::new_base("opencode", PlatformKind::Cli, &session_id, source, ingested_at);
     ev.id = make_event_id("opencode", &format!("{source}:{id}"));
     ev.call_id = Some(id);
@@ -250,6 +338,9 @@ fn parse_message_row(
     ev.model = model;
     ev.input_tokens = input;
     ev.output_tokens = output;
+    ev.cache_read_tokens = cache_read;
+    ev.cache_write_tokens = cache_write;
+    ev.reasoning_tokens = reasoning;
     ev.cost_usd = cost;
     ev.quality = UsageQuality::Exact;
     ev.compute_total();
@@ -274,13 +365,6 @@ fn scan_legacy_json(messages_dir: &Path, ingested_at: i64, filter: &ScanFilter) 
         let Ok(v) = serde_json::from_str::<Value>(&content) else {
             continue;
         };
-        let tokens = v.get("tokens");
-        let Some(tokens) = tokens else { continue };
-        let input = tokens.get("input").and_then(|x| x.as_i64()).unwrap_or(0);
-        let output = tokens.get("output").and_then(|x| x.as_i64()).unwrap_or(0);
-        if input == 0 && output == 0 {
-            continue;
-        }
         let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("unknown");
         let session_id = v
             .get("sessionID")
@@ -288,22 +372,29 @@ fn scan_legacy_json(messages_dir: &Path, ingested_at: i64, filter: &ScanFilter) 
             .and_then(|x| x.as_str())
             .unwrap_or("unknown");
         let source = path.display().to_string();
-        let mut ev =
-            UsageEvent::new_base("opencode", PlatformKind::Cli, session_id, &source, ingested_at);
-        ev.id = make_event_id("opencode", &format!("{source}:{id}"));
-        ev.call_id = Some(id.to_string());
-        ev.surface = Some("cli".into());
-        ev.provider = v
-            .get("providerID")
-            .and_then(|x| x.as_str())
-            .map(String::from);
-        ev.model = v.get("modelID").and_then(|x| x.as_str()).map(String::from);
-        ev.input_tokens = input;
-        ev.output_tokens = output;
-        ev.cost_usd = v.get("cost").and_then(|x| x.as_f64());
-        ev.quality = UsageQuality::Exact;
-        ev.compute_total();
-        events.push(ev);
+        if let Some(mut ev) = parse_opencode_payload(&v, id, session_id, None, &source, ingested_at) {
+            ev.id = make_event_id("opencode", &format!("{source}:{id}"));
+            events.push(ev);
+        }
     }
     Ok(events)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_tokens_with_cache() {
+        let v: Value = serde_json::from_str(
+            r#"{"tokens":{"input":4739,"output":96,"reasoning":0,"cache":{"write":0,"read":8448}}}"#,
+        )
+        .unwrap();
+        let (i, o, cr, cw, r) = parse_opencode_tokens(&v["tokens"]).unwrap();
+        assert_eq!(i, 4739);
+        assert_eq!(o, 96);
+        assert_eq!(cr, 8448);
+        assert_eq!(cw, 0);
+        assert_eq!(r, 0);
+    }
 }

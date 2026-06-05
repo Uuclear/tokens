@@ -15,6 +15,7 @@ const PLATFORMS: &[&str] = &[
     "openclaw",
     "hermes",
     "qwen_code",
+    "pi",
     "cline",
     "kilo_cli",
     "kilo_ide",
@@ -90,10 +91,19 @@ pub fn themed_logo_bytes(_theme: &str, _platform_id: &str) -> Option<(&'static s
 }
 
 fn load_source(dir: &Path, id: &str) -> Option<DynamicImage> {
-    for ext in ["png", "ico"] {
-        let p = dir.join(format!("{id}.{ext}"));
-        if p.exists() {
-            return image::open(&p).ok();
+    let candidates: Vec<String> = match id {
+        "qoder_cn" => vec!["qoder_cn".into(), "qoder".into()],
+        "kilo_ide" => vec!["kilo_ide".into(), "kilo_cli".into()],
+        _ => vec![id.into()],
+    };
+    for base in &candidates {
+        for ext in ["png", "ico"] {
+            let p = dir.join(format!("{base}.{ext}"));
+            if p.exists() {
+                if let Ok(img) = image::open(&p) {
+                    return Some(img);
+                }
+            }
         }
     }
     None

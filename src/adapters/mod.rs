@@ -8,6 +8,7 @@ mod hermes;
 mod kilo;
 mod openclaw;
 mod opencode;
+mod pi;
 pub mod optional;
 mod optional_api;
 mod qoder;
@@ -38,6 +39,7 @@ pub fn all_adapters() -> Vec<Box<dyn Adapter>> {
         Box::new(opencode::OpenCodeAdapter),
         Box::new(openclaw::OpenClawAdapter),
         Box::new(hermes::HermesAdapter),
+        Box::new(pi::PiAdapter),
         Box::new(cline::ClineAdapter),
         Box::new(kilo::KiloCliAdapter),
         Box::new(kilo::KiloIdeAdapter),

@@ -2,7 +2,6 @@ use crate::paths::{default_config_dir, default_db_path};
 use crate::serve::theme::UiTheme;
 use anyhow::{bail, Context, Result};
 use std::fs;
-use std::net::IpAddr;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -24,7 +23,7 @@ pub fn is_running() -> Result<bool> {
     Ok(process_alive(pid))
 }
 
-pub fn start_background(host: IpAddr, port: u16, ui: UiTheme) -> Result<()> {
+pub fn start_background(port: u16, ui: UiTheme) -> Result<()> {
     if is_running()? {
         bail!(
             "tokens serve 已在运行 (pid {})。使用 tokens serve --down 停止。",
@@ -37,8 +36,6 @@ pub fn start_background(host: IpAddr, port: u16, ui: UiTheme) -> Result<()> {
     let mut cmd = Command::new(&exe);
     cmd.arg("serve")
         .arg("--foreground")
-        .arg("--host")
-        .arg(host.to_string())
         .arg("--port")
         .arg(port.to_string())
         .arg("--db")
@@ -82,11 +79,8 @@ pub fn start_background(host: IpAddr, port: u16, ui: UiTheme) -> Result<()> {
     write_pid(pid)?;
     write_port(port)?;
     println!("tokens serve 已在后台启动 (pid {pid}, UI: {})", ui.label());
-    let addr = format!("{host}:{port}");
-    println!("监控页面: http://{addr}/");
-    if host.is_unspecified() {
-        println!("局域网/公网访问请使用本机 IP，例如 http://<你的IP>:{port}/");
-    }
+    println!("监控页面: http://0.0.0.0:{port}/");
+    println!("局域网/公网访问请使用本机 IP，例如 http://<你的IP>:{port}/");
     Ok(())
 }
 

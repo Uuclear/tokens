@@ -11,7 +11,7 @@
 
 ## Fields
 
-From `type: "assistant"` lines → `message.usage`:
+When present, reads `stats-cache.json` (same source as Claude Code `/usage` and `/stats`). Otherwise falls back to `type: "assistant"` lines → `message.usage`:
 
 - `input_tokens`, `output_tokens`
 - `cache_read_input_tokens`, `cache_creation_input_tokens`

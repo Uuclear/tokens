@@ -11,6 +11,7 @@ fn registry_has_macos_and_linux_paths_for_implemented_cli() {
         "cursor",
         "cline",
         "kilo_cli",
+        "pi",
     ] {
         let p = reg.get(id).unwrap();
         let paths = p.paths.as_ref().unwrap();

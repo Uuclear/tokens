@@ -83,8 +83,7 @@ tokens doctor
 ## 5. Web 监控面板
 
 ```bash
-tokens serve              # 后台 http://127.0.0.1:5790/（仅本机）
-tokens serve --host 0.0.0.0 # 监听所有网卡，局域网/公网可访问
+tokens serve              # 后台 http://0.0.0.0:5790/（监听所有网卡）
 tokens serve --ink        # 水墨灰阶主题（适合墨水屏浏览器）
 tokens serve --list-themes
 tokens serve --down
@@ -94,7 +93,7 @@ tokens serve --down
 
 ```bash
 tokens serve --down
-tokens serve --host 0.0.0.0
+tokens serve
 # 浏览器打开 http://192.168.1.10:5790/
 ```
 
@@ -116,7 +115,7 @@ Description=tokens web dashboard
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/tokens serve --foreground --host 0.0.0.0
+ExecStart=/usr/local/bin/tokens serve --foreground
 Restart=on-failure
 
 [Install]

@@ -113,6 +113,22 @@ platforms:
       linux:
         - "%HOME%/.qwen/projects/**/*"
 
+  - id: pi
+    display_name: Pi Coding Agent
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/pi.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.pi\\agent\\sessions\\**\\*.jsonl"
+      macos:
+        - "%HOME%/.pi/agent/sessions/**/*.jsonl"
+      linux:
+        - "%HOME%/.pi/agent/sessions/**/*.jsonl"
+      env_overrides:
+        - PI_AGENT_HOME
+
   - id: cline
     display_name: Cline
     kind: hybrid

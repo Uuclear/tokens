@@ -16,7 +16,8 @@ fn claude_jsonl_parses_usage() {
 #[test]
 fn registry_loads_all_platforms() {
     let reg = tokens::registry::PlatformRegistry::load_embedded().unwrap();
-    assert!(reg.platforms.len() >= 15);
+    assert!(reg.platforms.len() >= 16);
+    assert!(reg.get("pi").is_some());
     assert!(reg.get("claude_code").is_some());
     assert!(reg.get("qoder_cn").is_some());
 }
