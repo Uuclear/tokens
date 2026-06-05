@@ -38,8 +38,9 @@ fn cursor_adapter_scan_count() {
     eprintln!("bubble sample ok={ok} err={err} bytes_ok={bytes_ok} text_ok={text_ok}");
 
     let adapter = tokens::adapters::adapter_by_id("cursor").unwrap();
+    let filter = tokens::scan_filter::ScanFilter::parse_all();
     let events = adapter
-        .scan(chrono::Utc::now().timestamp_millis())
+        .scan(chrono::Utc::now().timestamp_millis(), &filter)
         .unwrap();
     eprintln!("cursor scan events: {}", events.len());
     if let Some(e) = events.first() {

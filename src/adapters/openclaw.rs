@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::openclaw_state_dir;
 use anyhow::Result;
@@ -24,7 +25,7 @@ impl Adapter for OpenClawAdapter {
         }])
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         let agents_root = openclaw_state_dir().join("agents");
         if !agents_root.exists() {
@@ -43,6 +44,9 @@ impl Adapter for OpenClawAdapter {
             })
         {
             let path = entry.path();
+            if !filter.should_parse(path)? {
+                continue;
+            }
             let agent_id = path
                 .ancestors()
                 .find(|p| p.parent().is_some_and(|pp| pp.ends_with("agents")))

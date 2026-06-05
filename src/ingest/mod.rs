@@ -1,5 +1,6 @@
 use crate::adapters::{self, Adapter};
 use crate::db::TokenStore;
+use crate::scan_filter::{ScanFilter, source_mtime_size};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::Path;
@@ -42,11 +43,11 @@ pub fn run_scan(store: &TokenStore, options: &ScanOptions) -> Result<ScanResult>
         if options.full_rescan {
             let _ = store.delete_platform_events(&platform)?;
         }
-        let events = adapter.scan(ingested_at)?;
+        let filter = ScanFilter::load(store, &platform, options.full_rescan)?;
+        let events = adapter.scan(ingested_at, &filter)?;
         let mut plat_inserted = 0i64;
         let mut plat_skipped = 0i64;
 
-        // Fingerprint at source-file granularity (not per event).
         let mut by_source: HashMap<String, Vec<crate::model::UsageEvent>> = HashMap::new();
         for event in events {
             by_source
@@ -56,25 +57,18 @@ pub fn run_scan(store: &TokenStore, options: &ScanOptions) -> Result<ScanResult>
         }
 
         for (source, batch) in by_source {
-            files_scanned += batch.len() as i64;
-            if should_skip_file(store, &platform, &source, options.full_rescan)? {
-                events_skipped += batch.len() as i64;
-                plat_skipped += batch.len() as i64;
-                continue;
-            }
-            let mut any_inserted = false;
-            for event in batch {
-                if store.insert_event(&event)? {
-                    events_inserted += 1;
-                    plat_inserted += 1;
-                    any_inserted = true;
-                } else {
-                    events_skipped += 1;
-                    plat_skipped += 1;
+            files_scanned += 1;
+            let (inserted, skipped) = store.insert_events_batch(&batch)?;
+            events_inserted += inserted;
+            events_skipped += skipped;
+            plat_inserted += inserted;
+            plat_skipped += skipped;
+            if inserted > 0 || options.full_rescan {
+                let path = Path::new(&source);
+                if path.exists() {
+                    let (mtime, size) = source_mtime_size(path)?;
+                    store.upsert_fingerprint(&platform, &source, mtime, size, ingested_at)?;
                 }
-            }
-            if any_inserted || options.full_rescan {
-                update_fingerprint(store, &platform, &source, ingested_at)?;
             }
         }
         per_platform.push((platform, plat_inserted, plat_skipped));
@@ -100,47 +94,3 @@ pub fn run_scan(store: &TokenStore, options: &ScanOptions) -> Result<ScanResult>
     })
 }
 
-fn should_skip_file(
-    store: &TokenStore,
-    platform: &str,
-    source: &str,
-    full_rescan: bool,
-) -> Result<bool> {
-    if full_rescan {
-        return Ok(false);
-    }
-    let path = Path::new(source);
-    if !path.exists() {
-        return Ok(false);
-    }
-    let meta = std::fs::metadata(path)?;
-    let mtime = meta
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    let size = meta.len() as i64;
-    store.should_skip_source(platform, source, mtime, size, full_rescan)
-}
-
-fn update_fingerprint(
-    store: &TokenStore,
-    platform: &str,
-    source: &str,
-    ingested_at: i64,
-) -> Result<()> {
-    let path = Path::new(source);
-    if !path.exists() {
-        return Ok(());
-    }
-    let meta = std::fs::metadata(path)?;
-    let mtime = meta
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    let size = meta.len() as i64;
-    store.upsert_fingerprint(platform, source, mtime, size, ingested_at)
-}

@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::discovery::{cursor_roots, CursorRootKind};
 use crate::util::json_extract::extract_model;
@@ -30,18 +31,18 @@ impl Adapter for CursorAdapter {
             .collect())
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         for root in cursor_roots() {
             match root.kind {
                 CursorRootKind::Vscdb => {
-                    events.extend(scan_vscdb(&root.path, &root.surface, ingested_at)?);
+                    events.extend(scan_vscdb(&root.path, &root.surface, ingested_at, filter)?);
                 }
                 CursorRootKind::AgentTranscripts => {
-                    events.extend(scan_agent_transcripts(&root.path, ingested_at)?);
+                    events.extend(scan_agent_transcripts(&root.path, ingested_at, filter)?);
                 }
                 CursorRootKind::CliStore => {
-                    events.extend(scan_cli_store(&root.path, ingested_at)?);
+                    events.extend(scan_cli_store(&root.path, ingested_at, filter)?);
                 }
             }
         }
@@ -115,7 +116,10 @@ fn load_composer_models(conn: &Connection) -> Result<HashMap<String, String>> {
     Ok(map)
 }
 
-fn scan_vscdb(db_path: &Path, surface: &str, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_vscdb(db_path: &Path, surface: &str, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
+    if !filter.should_parse(db_path)? {
+        return Ok(Vec::new());
+    }
     let conn = open_foreign_db(db_path)?;
     let source = db_path.display().to_string();
     let session_models = load_composer_models(&conn)?;
@@ -252,7 +256,7 @@ fn parse_composer_usage(
 }
 
 /// Agent mode / Cursor CLI conversation logs under `.cursor/projects/*/agent-transcripts/`.
-fn scan_agent_transcripts(projects_root: &Path, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_agent_transcripts(projects_root: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
     let mut events = Vec::new();
     if !projects_root.exists() {
         return Ok(events);
@@ -268,6 +272,9 @@ fn scan_agent_transcripts(projects_root: &Path, ingested_at: i64) -> Result<Vec<
         })
     {
         let path = entry.path();
+        if !filter.should_parse(path)? {
+            continue;
+        }
         let session_id = path
             .parent()
             .and_then(|p| p.file_name())
@@ -335,7 +342,7 @@ fn parse_agent_transcript_jsonl(
 }
 
 /// Optional Cursor CLI state under `%USERPROFILE%\.cursor\` (non-IDE).
-fn scan_cli_store(cursor_home: &Path, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_cli_store(cursor_home: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
     let mut events = Vec::new();
     let chats = cursor_home.join("chats");
     if chats.exists() {
@@ -345,6 +352,9 @@ fn scan_cli_store(cursor_home: &Path, ingested_at: i64) -> Result<Vec<UsageEvent
             .filter(|e| e.path().extension().is_some_and(|x| x == "jsonl" || x == "json"))
         {
             let path = entry.path();
+            if !filter.should_parse(path)? {
+                continue;
+            }
             if let Ok(content) = fs::read_to_string(path) {
                 let session_id = path
                     .file_stem()

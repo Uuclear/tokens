@@ -18,6 +18,12 @@ impl TokenStore {
         let conn = Connection::open(path)
             .with_context(|| format!("open database {}", path.display()))?;
         conn.execute_batch(MIGRATION_SQL)?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA temp_store=MEMORY;
+             PRAGMA cache_size=-64000;",
+        )?;
         Ok(Self { conn })
     }
 
@@ -50,6 +56,75 @@ impl TokenStore {
             )?;
         }
         Ok(())
+    }
+
+    pub fn load_fingerprints(&self, platform: &str) -> Result<std::collections::HashMap<String, (i64, i64)>> {
+        let mut map = std::collections::HashMap::new();
+        let mut stmt = self.conn.prepare(
+            "SELECT source_path, mtime_secs, size_bytes FROM source_fingerprints WHERE platform = ?1",
+        )?;
+        let rows = stmt.query_map(params![platform], |row| {
+            Ok((row.get::<_, String>(0)?, (row.get(1)?, row.get(2)?)))
+        })?;
+        for row in rows {
+            let (source, fp) = row?;
+            map.insert(source, fp);
+        }
+        Ok(map)
+    }
+
+    pub fn insert_events_batch(&self, events: &[UsageEvent]) -> Result<(i64, i64)> {
+        if events.is_empty() {
+            return Ok((0, 0));
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        let mut inserted = 0i64;
+        let mut skipped = 0i64;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT OR IGNORE INTO usage_events (
+                    id, platform, platform_kind, surface, session_id, call_id, ts,
+                    project_path, model, provider,
+                    input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, total_tokens,
+                    cost_usd, usage_unit, quality, source_path, ingested_at
+                ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                    ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21
+                )",
+            )?;
+            for event in events {
+                let rows = stmt.execute(params![
+                    event.id,
+                    event.platform,
+                    event.platform_kind.as_str(),
+                    event.surface,
+                    event.session_id,
+                    event.call_id,
+                    event.ts,
+                    event.project_path,
+                    event.model,
+                    event.provider,
+                    event.input_tokens,
+                    event.output_tokens,
+                    event.cache_read_tokens,
+                    event.cache_write_tokens,
+                    event.reasoning_tokens,
+                    event.total_tokens,
+                    event.cost_usd,
+                    event.usage_unit,
+                    event.quality.as_str(),
+                    event.source_path,
+                    event.ingested_at,
+                ])?;
+                if rows > 0 {
+                    inserted += 1;
+                } else {
+                    skipped += 1;
+                }
+            }
+        }
+        tx.commit()?;
+        Ok((inserted, skipped))
     }
 
     pub fn should_skip_source(

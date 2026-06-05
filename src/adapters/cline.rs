@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::{cline_data_dir, vscode_global_storage};
 use anyhow::Result;
@@ -32,15 +33,15 @@ impl Adapter for ClineAdapter {
         ])
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         let cli_tasks = cline_data_dir().join("tasks");
         if cli_tasks.exists() {
-            events.extend(scan_tasks_dir(&cli_tasks, "cli", ingested_at)?);
+            events.extend(scan_tasks_dir(&cli_tasks, "cli", ingested_at, filter)?);
         }
         let vscode_tasks = vscode_global_storage("saoudrizwan.claude-dev");
         if vscode_tasks.exists() {
-            events.extend(scan_tasks_dir(&vscode_tasks, "vscode", ingested_at)?);
+            events.extend(scan_tasks_dir(&vscode_tasks, "vscode", ingested_at, filter)?);
         }
         Ok(events)
     }
@@ -51,7 +52,8 @@ pub fn scan_tasks_dir_public(
     surface: &str,
     ingested_at: i64,
 ) -> Result<Vec<UsageEvent>> {
-    scan_tasks_dir(root, surface, ingested_at)
+    let filter = ScanFilter::parse_all();
+    scan_tasks_dir(root, surface, ingested_at, &filter)
 }
 
 pub fn parse_ui_messages_public(
@@ -64,7 +66,7 @@ pub fn parse_ui_messages_public(
     parse_ui_messages(content, path, task_id, surface, ingested_at)
 }
 
-fn scan_tasks_dir(root: &Path, surface: &str, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_tasks_dir(root: &Path, surface: &str, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
     let mut events = Vec::new();
     for entry in fs::read_dir(root)? {
         let entry = entry?;
@@ -78,6 +80,9 @@ fn scan_tasks_dir(root: &Path, surface: &str, ingested_at: i64) -> Result<Vec<Us
             .unwrap_or("unknown");
         let ui_path = task_dir.join("ui_messages.json");
         if ui_path.exists() {
+            if !filter.should_parse(&ui_path)? {
+                continue;
+            }
             let content = fs::read_to_string(&ui_path)?;
             events.extend(parse_ui_messages(
                 &content,

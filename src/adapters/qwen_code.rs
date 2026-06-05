@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::qwen_projects_dir;
 use anyhow::Result;
@@ -23,7 +24,7 @@ impl Adapter for QwenCodeAdapter {
         }])
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let root = qwen_projects_dir();
         if !root.exists() {
             return Ok(Vec::new());
@@ -38,6 +39,9 @@ impl Adapter for QwenCodeAdapter {
             })
         {
             let path = entry.path();
+            if !filter.should_parse(path)? {
+                continue;
+            }
             let content = fs::read_to_string(path)?;
             if path.extension().is_some_and(|x| x == "jsonl") {
                 for (i, line) in content.lines().enumerate() {

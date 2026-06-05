@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::codex_home;
 use crate::util::json_extract::extract_model;
@@ -30,7 +31,7 @@ impl Adapter for CodexAdapter {
         Ok(hits)
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         let home = codex_home();
         for sub in ["sessions", "archived_sessions"] {
@@ -44,6 +45,9 @@ impl Adapter for CodexAdapter {
                 .filter(|e| e.path().extension().is_some_and(|x| x == "jsonl"))
             {
                 let path = entry.path();
+                if !filter.should_parse(path)? {
+                    continue;
+                }
                 if let Ok(content) = fs::read_to_string(path) {
                     let session_id = path
                         .file_stem()

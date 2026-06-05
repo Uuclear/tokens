@@ -13,12 +13,13 @@ mod optional_api;
 mod qoder;
 mod qwen_code;
 
+use crate::scan_filter::ScanFilter;
 use crate::model::UsageEvent;
 use anyhow::Result;
 
 pub trait Adapter: Send + Sync {
     fn id(&self) -> &'static str;
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>>;
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>>;
     fn probe(&self) -> Result<Vec<ProbeHit>>;
 }
 

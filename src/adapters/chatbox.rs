@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::host;
 use anyhow::Result;
@@ -25,18 +26,18 @@ impl Adapter for ChatboxAdapter {
             .collect())
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         for base in host::chatbox_roots() {
             if base.exists() {
-                events.extend(scan_chatbox(&base, ingested_at)?);
+                events.extend(scan_chatbox(&base, ingested_at, filter)?);
             }
         }
         Ok(events)
     }
 }
 
-fn scan_chatbox(root: &std::path::Path, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_chatbox(root: &std::path::Path, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
     let mut events = Vec::new();
     for entry in WalkDir::new(root)
         .into_iter()
@@ -49,6 +50,9 @@ fn scan_chatbox(root: &std::path::Path, ingested_at: i64) -> Result<Vec<UsageEve
     {
         let path = entry.path();
         if path.is_file() {
+            if !filter.should_parse(path)? {
+                continue;
+            }
             if let Ok(content) = fs::read_to_string(path) {
                 if let Ok(v) = serde_json::from_str::<Value>(&content) {
                     events.extend(find_token_fields(&v, path, ingested_at));

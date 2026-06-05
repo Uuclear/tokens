@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::paths::host::{self, app_data_local_dir, user_home};
 use anyhow::Result;
 
@@ -36,7 +37,7 @@ impl Adapter for QoderAdapter {
             .collect())
     }
 
-    fn scan(&self, _ingested_at: i64) -> Result<Vec<crate::model::UsageEvent>> {
+    fn scan(&self, _ingested_at: i64, _filter: &ScanFilter) -> Result<Vec<crate::model::UsageEvent>> {
         // Do not fabricate token data per plan
         Ok(Vec::new())
     }

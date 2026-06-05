@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::discovery::{claude_all_roots, ClaudeRoot};
 use anyhow::Result;
@@ -27,7 +28,7 @@ impl Adapter for ClaudeCodeAdapter {
         Ok(hits)
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         for root in claude_all_roots() {
             if !root.path.exists() {
@@ -39,6 +40,9 @@ impl Adapter for ClaudeCodeAdapter {
                 .filter(|e| e.path().extension().is_some_and(|x| x == "jsonl"))
             {
                 let path = entry.path();
+                if !filter.should_parse(path)? {
+                    continue;
+                }
                 if let Ok(content) = fs::read_to_string(path) {
                     let file_session = path
                         .file_stem()

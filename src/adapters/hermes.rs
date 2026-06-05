@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::hermes_home;
 use crate::util::sqlite_ext::open_foreign_db;
@@ -22,9 +23,12 @@ impl Adapter for HermesAdapter {
         }])
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let db_path = hermes_home().join("state.db");
         if !db_path.exists() {
+            return Ok(Vec::new());
+        }
+        if !filter.should_parse(&db_path)? {
             return Ok(Vec::new());
         }
         scan_hermes_db(&db_path, ingested_at)

@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::adapters::cline::parse_ui_messages_public;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::{expand_path_template, host, vscode_global_storage};
@@ -26,9 +27,12 @@ impl Adapter for KiloCliAdapter {
             .collect())
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let db = host::kilo_cli_db();
         if !db.exists() {
+            return Ok(Vec::new());
+        }
+        if !filter.should_parse(&db)? {
             return Ok(Vec::new());
         }
         scan_kilo_db(&db, ingested_at)
@@ -52,21 +56,21 @@ impl Adapter for KiloIdeAdapter {
         }])
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         for root in [
             vscode_global_storage("kilocode.kilo-code"),
             expand_path_template("%USERPROFILE%\\.kilocode\\cli\\global\\tasks"),
         ] {
             if root.exists() {
-                events.extend(scan_kilo_ide_tasks(&root, ingested_at)?);
+                events.extend(scan_kilo_ide_tasks(&root, ingested_at, filter)?);
             }
         }
         Ok(events)
     }
 }
 
-fn scan_kilo_ide_tasks(root: &Path, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_kilo_ide_tasks(root: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
     let mut events = Vec::new();
     for entry in fs::read_dir(root)? {
         let entry = entry?;
@@ -80,6 +84,9 @@ fn scan_kilo_ide_tasks(root: &Path, ingested_at: i64) -> Result<Vec<UsageEvent>>
             .unwrap_or("unknown");
         let ui_path = task_dir.join("ui_messages.json");
         if ui_path.exists() {
+            if !filter.should_parse(&ui_path)? {
+                continue;
+            }
             let content = fs::read_to_string(&ui_path)?;
             for mut ev in parse_ui_messages_public(
                 &content,

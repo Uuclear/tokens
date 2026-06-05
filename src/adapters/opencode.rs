@@ -1,4 +1,5 @@
 use super::{Adapter, ProbeHit};
+use crate::scan_filter::ScanFilter;
 use crate::model::{make_event_id, PlatformKind, UsageEvent, UsageQuality};
 use crate::paths::opencode_data_dirs;
 use crate::util::sqlite_ext::{list_tables, open_foreign_db, table_columns};
@@ -38,7 +39,7 @@ impl Adapter for OpenCodeAdapter {
         Ok(hits)
     }
 
-    fn scan(&self, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+    fn scan(&self, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
         let mut events = Vec::new();
         for base in opencode_data_dirs() {
             if !base.exists() {
@@ -47,17 +48,20 @@ impl Adapter for OpenCodeAdapter {
             for name in ["opencode.db", "opencode-stable.db"] {
                 let db_path = base.join(name);
                 if db_path.exists() {
-                    events.extend(scan_sqlite(&db_path, ingested_at)?);
+                    events.extend(scan_sqlite(&db_path, ingested_at, filter)?);
                 }
             }
-            events.extend(scan_legacy_json(&base.join("storage/message"), ingested_at)?);
-            events.extend(scan_legacy_json(&base.join("storage/part"), ingested_at)?);
+            events.extend(scan_legacy_json(&base.join("storage/message"), ingested_at, filter)?);
+            events.extend(scan_legacy_json(&base.join("storage/part"), ingested_at, filter)?);
         }
         Ok(events)
     }
 }
 
-fn scan_sqlite(db_path: &Path, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_sqlite(db_path: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
+    if !filter.should_parse(db_path)? {
+        return Ok(Vec::new());
+    }
     let conn = open_foreign_db(db_path)?;
     let source = db_path.display().to_string();
     let mut events = Vec::new();
@@ -252,7 +256,7 @@ fn parse_message_row(
     Some(ev)
 }
 
-fn scan_legacy_json(messages_dir: &Path, ingested_at: i64) -> Result<Vec<UsageEvent>> {
+fn scan_legacy_json(messages_dir: &Path, ingested_at: i64, filter: &ScanFilter) -> Result<Vec<UsageEvent>> {
     let mut events = Vec::new();
     if !messages_dir.exists() {
         return Ok(events);
@@ -263,6 +267,9 @@ fn scan_legacy_json(messages_dir: &Path, ingested_at: i64) -> Result<Vec<UsageEv
         .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
     {
         let path = entry.path();
+        if !filter.should_parse(path)? {
+            continue;
+        }
         let content = fs::read_to_string(path)?;
         let Ok(v) = serde_json::from_str::<Value>(&content) else {
             continue;

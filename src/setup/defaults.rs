@@ -10,16 +10,8 @@ pub fn default_paths_for(platform: &PlatformEntry) -> Vec<PathBuf> {
     if let Some(ref pp) = platform.paths {
         for template in pp.templates_for_host() {
             let expanded = expand_path_template(strip_glob(&template));
-            paths.push(expanded);
-        }
-    }
-    if let Some(adapter) = adapters::adapter_by_id(&platform.id) {
-        if let Ok(hits) = adapter.probe() {
-            for h in hits {
-                let p = PathBuf::from(&h.path);
-                if !paths.iter().any(|x| x == &p) {
-                    paths.push(p);
-                }
+            if !paths.iter().any(|x| x == &expanded) {
+                paths.push(expanded);
             }
         }
     }

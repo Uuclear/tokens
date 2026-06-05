@@ -10,7 +10,8 @@ use crate::paths::user_config::{self, UserPathConfig};
 use crate::registry::PlatformRegistry;
 use anyhow::{Context, Result};
 use axum::Router;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,12 +21,14 @@ use web::AppState;
 
 pub fn run_serve(
     db_path: PathBuf,
+    host: &str,
     port: u16,
     down: bool,
     foreground: bool,
     dev: bool,
     ui: UiTheme,
 ) -> Result<()> {
+    let host = parse_listen_host(host)?;
     if down {
         return daemon::stop();
     }
@@ -33,12 +36,24 @@ pub fn run_serve(
         anyhow::bail!("--dev 需与 --foreground 一起使用（在仓库根目录前台运行）");
     }
     if !foreground {
-        return daemon::start_background(port, ui);
+        return daemon::start_background(host, port, ui);
     }
-    run_foreground_server(db_path, port, ui, dev)
+    run_foreground_server(db_path, host, port, ui, dev)
 }
 
-fn run_foreground_server(db_path: PathBuf, port: u16, ui: UiTheme, dev: bool) -> Result<()> {
+fn parse_listen_host(host: &str) -> Result<IpAddr> {
+    IpAddr::from_str(host).with_context(|| format!("无效监听地址: {host}"))
+}
+
+fn print_listen_urls(host: IpAddr, port: u16) {
+    let addr = SocketAddr::from((host, port));
+    println!("监听: http://{addr}/");
+    if host.is_unspecified() {
+        println!("局域网/公网访问请使用本机 IP，例如 http://<你的IP>:{port}/");
+    }
+}
+
+fn run_foreground_server(db_path: PathBuf, host: IpAddr, port: u16, ui: UiTheme, dev: bool) -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -73,12 +88,13 @@ fn run_foreground_server(db_path: PathBuf, port: u16, ui: UiTheme, dev: bool) ->
         spawn_scan_loop(db_path.clone());
 
         let app: Router = web::router(state);
-        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        let addr = SocketAddr::from((host, port));
         let listener = tokio::net::TcpListener::bind(addr)
             .await
             .with_context(|| format!("bind {addr}"))?;
 
-        println!("tokens 监控 ({}, {}): http://{addr}/", ui.id(), ui.label());
+        println!("tokens 监控 ({}, {})", ui.id(), ui.label());
+        print_listen_urls(host, port);
         if dev {
             println!("开发模式：HTML/JS 从磁盘加载，改 src/serve 后浏览器刷新即可");
             println!("（修改 Rust 代码仍需重新 cargo build）");

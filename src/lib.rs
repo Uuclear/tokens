@@ -5,6 +5,7 @@ pub mod ingest;
 pub mod model;
 pub mod paths;
 pub mod registry;
+pub mod scan_filter;
 pub mod serve;
 pub mod setup;
 pub mod util;
