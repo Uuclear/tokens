@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tokens · terminal</title>
+  <style>
+    :root {
+      --bg0: #050805;
+      --card: rgba(0, 20, 0, 0.85);
+      --card-border: #1a4d1a;
+      --text: #39ff14;
+      --muted: #2db82d;
+      --muted2: #1f7a1f;
+      --accent: #39ff14;
+      --radius: 4px;
+      --shadow: none;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Consolas", "Courier New", monospace;
+      background: var(--bg0);
+      color: var(--text);
+      min-height: 100vh;
+      text-shadow: 0 0 6px rgba(57, 255, 20, 0.35);
+    }
+    body::before {
+      content: "";
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px);
+    }
+    .bg-glow { display: none; }
+    .wrap { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem 2.5rem; }
+    header.hero {
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1rem; margin-bottom: 1rem;
+      display: grid; grid-template-columns: 1fr auto; gap: 1rem;
+    }
+    .brand { display: flex; gap: 0.6rem; align-items: center; }
+    .brand-icon {
+      width: 36px; height: 36px; border: 1px solid var(--accent);
+      display: grid; place-items: center; font-weight: 700;
+    }
+    .brand h1 { font-size: 1rem; }
+    .brand p { color: var(--muted); font-size: 0.75rem; }
+    .hero-total .label { font-size: 0.7rem; color: var(--muted2); }
+    .hero-total .value { font-size: 2rem; font-weight: 700; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+    .pill-group { display: flex; border: 1px solid var(--card-border); }
+    .pill { background: transparent; border: none; color: var(--muted); padding: 0.35rem 0.8rem; font: inherit; cursor: pointer; }
+    .pill.active { background: var(--accent); color: #050805; text-shadow: none; }
+    .btn { border: 1px solid var(--card-border); background: var(--card); color: var(--text); padding: 0.35rem 0.8rem; font: inherit; cursor: pointer; }
+    .refresh-hint { font-size: 0.72rem; color: var(--muted2); margin-left: auto; }
+    .stat-chip, .card, .chart-panel, .empty, .loading {
+      background: var(--card); border: 1px solid var(--card-border); padding: 0.85rem;
+    }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+    .stat-chip .k { font-size: 0.65rem; color: var(--muted2); }
+    .stat-chip .v { font-size: 1.2rem; font-weight: 700; }
+    .chart-panel { margin-bottom: 1rem; }
+    .chart-wrap { height: 240px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0.75rem; }
+    .plat-logo, .plat-badge { width: 40px; height: 40px; border: 1px solid var(--card-border); flex-shrink: 0; }
+    .plat-logo { object-fit: contain; padding: 4px; background: #050805; }
+    .plat-badge { display: grid; place-items: center; font-weight: 700; }
+    .card-head { display: flex; gap: 0.65rem; margin-bottom: 0.65rem; }
+    .card-total { margin-left: auto; text-align: right; }
+    .share-bar { height: 3px; background: #0a1a0a; margin-bottom: 0.5rem; }
+    .share-bar i { display: block; height: 100%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.35rem; margin-bottom: 0.5rem; }
+    .metric { border: 1px dashed var(--card-border); padding: 0.35rem; }
+    .section-title { font-size: 0.68rem; color: var(--muted2); margin-top: 0.5rem; }
+    .surface-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 0.4rem; font-size: 0.78rem; align-items: center; }
+    .mini-bar { height: 4px; background: #0a1a0a; }
+    .mini-bar i { display: block; height: 100%; background: var(--accent); }
+    .model-tag { font-size: 0.7rem; border: 1px solid var(--card-border); padding: 0.2rem 0.45rem; margin: 0.15rem; display: inline-block; }
+    .empty, .loading { grid-column: 1 / -1; text-align: center; padding: 2.5rem; }
+    .loading .spinner {
+      width: 28px; height: 28px; border: 2px solid var(--card-border);
+      border-top-color: var(--accent); border-radius: 50%; margin: 0 auto 0.75rem;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <header class="hero">
+      <div class="brand">
+        <div class="brand-icon">&gt;_</div>
+        <div><h1>TOKEN_MONITOR.EXE</h1><p>// terminal theme</p></div>
+      </div>
+      <div class="hero-total">
+        <div class="label">TOTAL :: <span id="since-label">ALL</span></div>
+        <div class="value" id="grand">—</div>
+      </div>
+    </header>
+    <div class="toolbar">
+      <div class="pill-group" id="since-pills">
+        <button type="button" class="pill" data-since="7d">7d</button>
+        <button type="button" class="pill" data-since="30d">30d</button>
+        <button type="button" class="pill active" data-since="all">all</button>
+      </div>
+      <button type="button" class="btn" id="refresh">[reload]</button>
+      <span class="refresh-hint" id="refresh-hint"></span>
+    </div>
+    <div id="dashboard-main">
+      <div class="stats-row" id="summary" style="display:none">
+        <div class="stat-chip"><div class="k">platforms</div><div class="v" id="stat-platforms">—</div></div>
+        <div class="stat-chip"><div class="k">sessions</div><div class="v" id="stat-sessions">—</div></div>
+        <div class="stat-chip"><div class="k">calls</div><div class="v" id="stat-calls">—</div></div>
+        <div class="stat-chip"><div class="k">input</div><div class="v" id="stat-in">—</div></div>
+        <div class="stat-chip"><div class="k">output</div><div class="v" id="stat-out">—</div></div>
+      </div>
+      <section class="chart-panel" id="chart-panel" style="display:none">
+        <h3>&gt; daily_usage.log</h3>
+        <div class="chart-wrap"><canvas id="daily-chart"></canvas></div>
+      </section>
+      <div class="grid" id="grid"><div class="loading"><div class="spinner"></div>loading...</div></div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>window.TOKENS_UI={
+    logoClass:'logo-theme-terminal',chartPrimary:'#39ff14',chartFill:'rgba(57,255,20,0.08)',chartTension:0.2,
+    legendColor:'#2db82d',tickColor:'#1f7a1f',gridX:'rgba(57,255,20,0.08)',gridY:'rgba(57,255,20,0.12)',
+    refreshHint:'auto refresh 60s',chartFont:'monospace',animMs:300
+  };</script>
+  <script src="/app.js"></script>
+</body>
+</html>

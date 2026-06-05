@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tokens · paper</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,400&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #f3ebe0;
+      --bg1: #ebe2d4;
+      --card: #fffdf8;
+      --card-border: #d4c4a8;
+      --text: #2c2416;
+      --muted: #6b5d48;
+      --muted2: #9a8b72;
+      --accent: #8b5e34;
+      --green: #4a6b3a;
+      --radius: 8px;
+      --shadow: 0 4px 20px rgba(44, 36, 22, 0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Source Sans 3", "Segoe UI", sans-serif;
+      background: linear-gradient(165deg, var(--bg0), var(--bg1));
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .bg-glow {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h60v60H0z' fill='none'/%3E%3Cpath d='M30 0v60M0 30h60' stroke='%23d4c4a8' stroke-width='0.3' opacity='0.35'/%3E%3C/svg%3E");
+    }
+    .wrap { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    header.hero {
+      display: grid; grid-template-columns: 1fr auto; gap: 1.5rem;
+      margin-bottom: 1.5rem; padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand { display: flex; gap: 0.75rem; align-items: center; }
+    .brand-icon {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: var(--accent); color: #fffdf8;
+      display: grid; place-items: center;
+      font-family: Lora, serif; font-weight: 600; font-size: 1.1rem;
+    }
+    .brand h1 { font-family: Lora, serif; font-size: 1.35rem; font-weight: 600; }
+    .brand p { color: var(--muted); font-size: 0.88rem; }
+    .hero-total .label { font-size: 0.75rem; color: var(--muted2); font-style: italic; }
+    .hero-total .value {
+      font-family: Lora, serif; font-size: 2.4rem; font-weight: 600; color: var(--accent);
+    }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.25rem; align-items: center; }
+    .pill-group {
+      display: flex; background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 999px; padding: 3px;
+    }
+    .pill { border: none; background: transparent; color: var(--muted); padding: 0.4rem 1rem; border-radius: 999px; font: inherit; cursor: pointer; }
+    .pill.active { background: var(--accent); color: #fffdf8; }
+    .btn {
+      border: 1px solid var(--card-border); background: var(--card);
+      padding: 0.45rem 1rem; border-radius: 999px; font: inherit; cursor: pointer;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .refresh-hint { font-size: 0.78rem; color: var(--muted2); margin-left: auto; font-style: italic; }
+    .stat-chip, .card, .chart-panel {
+      background: var(--card); border: 1px solid var(--card-border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .stat-chip { padding: 0.9rem 1rem; }
+    .stat-chip .k { font-size: 0.72rem; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-chip .v { font-size: 1.35rem; font-weight: 600; color: var(--text); }
+    .chart-panel { padding: 1.15rem; margin-bottom: 1.5rem; }
+    .chart-panel h3 { font-family: Lora, serif; font-size: 1rem; margin-bottom: 0.75rem; color: var(--muted); }
+    .chart-wrap { height: 260px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.15rem; }
+    .card { padding: 1.15rem; transition: transform 0.2s; }
+    .card:hover { transform: translateY(-2px); }
+    .plat-logo, .plat-badge {
+      width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+    }
+    .plat-logo {
+      border: 1px solid var(--card-border); padding: 5px; object-fit: contain; background: #fff;
+    }
+    .card-head { display: flex; gap: 0.8rem; margin-bottom: 0.85rem; }
+    .card-head h2 { font-family: Lora, serif; font-size: 1.05rem; }
+    .card-total { margin-left: auto; text-align: right; }
+    .share-bar { height: 5px; background: #ede4d6; border-radius: 99px; margin-bottom: 0.65rem; overflow: hidden; }
+    .share-bar i { display: block; height: 100%; border-radius: 99px; }
+    .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.45rem; margin-bottom: 0.55rem; }
+    .metric { background: #f8f2e8; border-radius: 6px; padding: 0.45rem 0.55rem; }
+    .metric .k { font-size: 0.68rem; color: var(--muted2); }
+    .section-title { font-size: 0.7rem; color: var(--muted2); font-style: italic; margin-top: 0.5rem; }
+    .surface-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 0.5rem; font-size: 0.82rem; align-items: center; }
+    .mini-bar { height: 6px; background: #ede4d6; border-radius: 99px; overflow: hidden; }
+    .mini-bar i { display: block; height: 100%; border-radius: 99px; }
+    .model-tag {
+      font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 4px;
+      background: #f8f2e8; border: 1px solid var(--card-border); display: inline-block; margin: 0.15rem;
+    }
+    .empty, .loading {
+      grid-column: 1 / -1; text-align: center; padding: 3rem;
+      background: var(--card); border: 1px dashed var(--card-border); border-radius: var(--radius);
+      color: var(--muted);
+    }
+    .loading .spinner {
+      width: 32px; height: 32px; border: 2px solid var(--card-border);
+      border-top-color: var(--accent); border-radius: 50%; margin: 0 auto 0.75rem;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="wrap" id="wrap">
+    <header class="hero">
+      <div class="brand">
+        <div class="brand-icon">T</div>
+        <div><h1>Token Ledger</h1><p>纸本暖色阅读视图</p></div>
+      </div>
+      <div class="hero-total">
+        <div class="label">合计 · <span id="since-label">全部</span></div>
+        <div class="value" id="grand">—</div>
+      </div>
+    </header>
+    <div class="toolbar">
+      <div class="pill-group" id="since-pills">
+        <button type="button" class="pill" data-since="7d">7 天</button>
+        <button type="button" class="pill" data-since="30d">30 天</button>
+        <button type="button" class="pill active" data-since="all">全部</button>
+      </div>
+      <button type="button" class="btn" id="refresh">↻ 刷新</button>
+      <span class="refresh-hint" id="refresh-hint"></span>
+    </div>
+    <div id="dashboard-main">
+      <div class="stats-row" id="summary" style="display:none">
+        <div class="stat-chip"><div class="k">平台</div><div class="v" id="stat-platforms">—</div></div>
+        <div class="stat-chip"><div class="k">Sessions</div><div class="v" id="stat-sessions">—</div></div>
+        <div class="stat-chip"><div class="k">Calls</div><div class="v" id="stat-calls">—</div></div>
+        <div class="stat-chip"><div class="k">Input</div><div class="v" id="stat-in">—</div></div>
+        <div class="stat-chip"><div class="k">Output</div><div class="v" id="stat-out">—</div></div>
+      </div>
+      <section class="chart-panel" id="chart-panel" style="display:none">
+        <h3>每日用量趋势</h3>
+        <div class="chart-wrap"><canvas id="daily-chart"></canvas></div>
+      </section>
+      <div class="grid" id="grid"><div class="loading"><div class="spinner"></div>加载中…</div></div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>window.TOKENS_UI={
+    logoClass:'logo-theme-paper',chartPrimary:'#8b5e34',chartFill:'rgba(139,94,52,0.12)',chartTension:0.4,
+    legendColor:'#6b5d48',tickColor:'#9a8b72',gridX:'rgba(44,36,22,0.06)',gridY:'rgba(44,36,22,0.08)',
+    refreshHint:'每 60 秒自动刷新'
+  };</script>
+  <script src="/app.js"></script>
+</body>
+</html>

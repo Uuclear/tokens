@@ -1,0 +1,50 @@
+[package]
+name = "tokens"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-platform AI agent token usage statistics CLI"
+license = "MIT"
+
+[lib]
+name = "tokens"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tokens"
+path = "src/main.rs"
+
+[[bin]]
+name = "generate_theme_logos"
+path = "src/bin/generate_theme_logos.rs"
+required-features = ["logo-gen"]
+
+[features]
+default = []
+logo-gen = ["dep:image"]
+optional_api = ["reqwest"]
+dify = ["optional_api"]
+postman = ["optional_api"]
+cursor_api = ["optional_api"]
+pricing = []
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+dirs = "6"
+glob = "0.3"
+hex = "0.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
+walkdir = "2"
+dialoguer = "0.11"
+axum = "0.7"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time", "fs"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "ico"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"

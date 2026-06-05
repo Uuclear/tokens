@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tokens · ink</title>
+  <style>
+    :root {
+      --bg0: #fafafa;
+      --card: #ffffff;
+      --card-border: #222;
+      --text: #111;
+      --muted: #444;
+      --muted2: #777;
+      --accent: #111;
+      --radius: 2px;
+      --shadow: none;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg0);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .bg-glow { display: none; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 2.5rem; }
+    header.hero {
+      display: grid; grid-template-columns: 1fr auto; gap: 1rem;
+      border-bottom: 2px solid var(--text); padding-bottom: 1rem; margin-bottom: 1.25rem;
+    }
+    .brand { display: flex; gap: 0.65rem; align-items: center; }
+    .brand-icon {
+      width: 38px; height: 38px; border: 2px solid var(--text);
+      display: grid; place-items: center; font-weight: 700; background: var(--card);
+    }
+    .brand h1 { font-size: 1.1rem; font-weight: 600; }
+    .brand p { color: var(--muted); font-size: 0.85rem; }
+    .hero-total .label { font-size: 0.72rem; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.06em; }
+    .hero-total .value { font-size: 2.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: center; }
+    .pill-group { display: flex; border: 1px solid var(--text); }
+    .pill { border: none; background: var(--card); color: var(--muted); padding: 0.4rem 0.9rem; font: inherit; cursor: pointer; }
+    .pill.active { background: var(--text); color: var(--card); }
+    .btn { border: 1px solid var(--text); background: var(--card); padding: 0.4rem 0.9rem; font: inherit; cursor: pointer; }
+    .refresh-hint { font-size: 0.75rem; color: var(--muted2); margin-left: auto; }
+    .stat-chip, .card, .chart-panel, .empty, .loading {
+      background: var(--card); border: 1px solid var(--text); padding: 1rem;
+    }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; margin-bottom: 1.25rem; }
+    .stat-chip .k { font-size: 0.7rem; color: var(--muted2); text-transform: uppercase; }
+    .stat-chip .v { font-size: 1.3rem; font-weight: 600; }
+    .chart-panel { margin-bottom: 1.25rem; }
+    .chart-panel h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .chart-wrap { height: 250px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; }
+    .plat-logo, .plat-badge {
+      width: 42px; height: 42px; flex-shrink: 0;
+    }
+    .plat-logo {
+      object-fit: contain;
+      border: 2px solid var(--text);
+      padding: 4px;
+      background: var(--card);
+    }
+    .plat-badge {
+      border: 2px solid var(--text);
+      display: grid; place-items: center; font-weight: 700;
+    }
+    .card-head { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .card-total { margin-left: auto; text-align: right; }
+    .share-bar { height: 4px; background: #ddd; margin-bottom: 0.65rem; }
+    .share-bar i { display: block; height: 100%; background: var(--text); }
+    .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.4rem; margin-bottom: 0.5rem; }
+    .metric { border: 1px solid #ccc; padding: 0.4rem; }
+    .metric .k { font-size: 0.65rem; color: var(--muted2); }
+    .section-title { font-size: 0.7rem; text-transform: uppercase; color: var(--muted2); margin-top: 0.5rem; }
+    .surface-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 0.45rem; font-size: 0.8rem; align-items: center; }
+    .mini-bar { height: 5px; background: #e5e5e5; }
+    .mini-bar i { display: block; height: 100%; background: var(--text); }
+    .model-tag { font-size: 0.72rem; border: 1px solid #aaa; padding: 0.2rem 0.5rem; display: inline-block; margin: 0.15rem; }
+    .empty, .loading { grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--muted); }
+    .loading .spinner {
+      width: 30px; height: 30px; border: 2px solid #ccc; border-top-color: var(--text);
+      border-radius: 50%; margin: 0 auto 0.75rem; animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <header class="hero">
+      <div class="brand">
+        <div class="brand-icon">墨</div>
+        <div><h1>Token 用量</h1><p>水墨灰阶 · 电子墨水屏</p></div>
+      </div>
+      <div class="hero-total">
+        <div class="label">合计 · <span id="since-label">全部</span></div>
+        <div class="value" id="grand">—</div>
+      </div>
+    </header>
+    <div class="toolbar">
+      <div class="pill-group" id="since-pills">
+        <button type="button" class="pill" data-since="7d">7 天</button>
+        <button type="button" class="pill" data-since="30d">30 天</button>
+        <button type="button" class="pill active" data-since="all">全部</button>
+      </div>
+      <button type="button" class="btn" id="refresh">刷新</button>
+      <span class="refresh-hint" id="refresh-hint"></span>
+    </div>
+    <div id="dashboard-main">
+      <div class="stats-row" id="summary" style="display:none">
+        <div class="stat-chip"><div class="k">平台</div><div class="v" id="stat-platforms">—</div></div>
+        <div class="stat-chip"><div class="k">Sessions</div><div class="v" id="stat-sessions">—</div></div>
+        <div class="stat-chip"><div class="k">Calls</div><div class="v" id="stat-calls">—</div></div>
+        <div class="stat-chip"><div class="k">Input</div><div class="v" id="stat-in">—</div></div>
+        <div class="stat-chip"><div class="k">Output</div><div class="v" id="stat-out">—</div></div>
+      </div>
+      <section class="chart-panel" id="chart-panel" style="display:none">
+        <h3>每日用量</h3>
+        <div class="chart-wrap"><canvas id="daily-chart"></canvas></div>
+      </section>
+      <div class="grid" id="grid"><div class="loading"><div class="spinner"></div>加载中…</div></div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>window.TOKENS_UI={
+    logoClass:'logo-theme-ink',chartStepped:true,chartPrimary:'#111',chartFill:'transparent',
+    chartTension:0,fillSeries:false,pointRadius:1,borderWidth:2,animMs:0,
+    legendColor:'#444',tickColor:'#666',gridX:'#e0e0e0',gridY:'#d5d5d5',
+    refreshHint:'60 秒刷新'
+  };</script>
+  <script src="/app.js"></script>
+</body>
+</html>

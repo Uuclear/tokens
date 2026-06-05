@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tokens · monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #070b12;
+      --bg1: #0d1320;
+      --card: rgba(22, 30, 46, 0.72);
+      --card-border: rgba(255, 255, 255, 0.06);
+      --text: #eef2f8;
+      --muted: #8b9cb8;
+      --muted2: #5c6d88;
+      --accent: #5b9cff;
+      --green: #34d399;
+      --radius: 14px;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg0);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .bg-glow {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, rgba(91, 156, 255, 0.18), transparent),
+        radial-gradient(ellipse 60% 40% at 90% 0%, rgba(52, 211, 153, 0.1), transparent),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 100%);
+      z-index: 0;
+    }
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+    }
+    header.hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: end;
+      margin-bottom: 2rem;
+      padding-bottom: 1.75rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(91, 156, 255, 0.35);
+    }
+    .brand h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .brand p { color: var(--muted); font-size: 0.9rem; }
+    .hero-total {
+      text-align: right;
+    }
+    .hero-total .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted2);
+      margin-bottom: 0.25rem;
+    }
+    .hero-total .value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 30%, var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .pill-group {
+      display: flex;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      padding: 3px;
+    }
+    .pill {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 0.4rem 1rem;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .pill.active {
+      background: rgba(91, 156, 255, 0.2);
+      color: var(--text);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .btn {
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--text);
+      padding: 0.45rem 1rem;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn:active { transform: scale(0.98); }
+    .btn.is-busy { opacity: 0.85; pointer-events: none; }
+    .btn.is-busy::after {
+      content: "";
+      display: inline-block;
+      width: 0.75em;
+      height: 0.75em;
+      margin-left: 0.4em;
+      border: 2px solid var(--muted);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      vertical-align: -0.1em;
+      animation: spin 0.7s linear infinite;
+    }
+    .refresh-hint {
+      font-size: 0.78rem;
+      color: var(--muted2);
+      margin-left: auto;
+    }
+    .wrap.is-refreshing #dashboard-main {
+      opacity: 0.88;
+      transition: opacity 0.35s ease;
+    }
+    #dashboard-main {
+      opacity: 1;
+      transition: opacity 0.35s ease;
+    }
+    .wrap.is-refreshing .chart-panel,
+    .wrap.is-refreshing .grid {
+      pointer-events: none;
+    }
+    .hero-total .value,
+    .stat-chip .v {
+      transition: opacity 0.25s ease, filter 0.25s ease;
+    }
+    .wrap.is-refreshing .hero-total .value,
+    .wrap.is-refreshing .stat-chip .v {
+      filter: brightness(0.92);
+    }
+    .grid {
+      transition: opacity 0.3s ease;
+    }
+    .card.card--static {
+      animation: none;
+    }
+    .card.card--flash {
+      animation: cardFlash 0.5s ease;
+    }
+    @keyframes cardFlash {
+      0% { box-shadow: var(--shadow); }
+      40% { box-shadow: 0 0 0 1px rgba(91, 156, 255, 0.35), var(--shadow); }
+      100% { box-shadow: var(--shadow); }
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.75rem;
+    }
+    .stat-chip {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 0.9rem 1.1rem;
+      backdrop-filter: blur(12px);
+    }
+    .stat-chip .k {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted2);
+    }
+    .stat-chip .v {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-top: 0.15rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.25rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem;
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, border-color 0.2s;
+      animation: fadeUp 0.45s ease backwards;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,0.1);
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .chart-panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem 1rem;
+      margin-bottom: 1.75rem;
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+    }
+    .chart-panel h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--muted);
+    }
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+    .plat-logo, .plat-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+    .plat-logo {
+      object-fit: contain;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 6px;
+    }
+    .plat-badge {
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border: 2px solid;
+      background: rgba(255,255,255,0.04);
+    }
+    .card-head h2 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .card-head .sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.15rem;
+    }
+    .card-total {
+      margin-left: auto;
+      text-align: right;
+    }
+    .card-total .num {
+      font-size: 1.2rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .card-total .pct {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .share-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 99px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .share-bar i {
+      display: block;
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.6s ease;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .metric {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 0.5rem 0.65rem;
+    }
+    .metric .k { font-size: 0.68rem; color: var(--muted2); }
+    .metric .v { font-size: 0.9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .section-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted2);
+      margin: 0.75rem 0 0.5rem;
+    }
+    .surface-list { display: flex; flex-direction: column; gap: 0.45rem; }
+    .surface-row {
+      display: grid;
+      grid-template-columns: 72px 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+    .surface-row .name {
+      color: var(--muted);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.75rem;
+    }
+    .mini-bar {
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .mini-bar i { display: block; height: 100%; border-radius: 99px; opacity: 0.85; }
+    .surface-row .vals { text-align: right; white-space: nowrap; }
+    .surface-row .vals strong { font-weight: 600; }
+    .surface-row .vals span { color: var(--muted2); font-size: 0.72rem; margin-left: 0.35rem; }
+    .models {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.35rem;
+    }
+    .model-tag {
+      font-size: 0.72rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--card-border);
+      color: var(--muted);
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .model-tag b { color: var(--text); font-weight: 500; }
+    .fav {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .fav em { color: var(--text); font-style: normal; font-weight: 500; }
+    .empty, .loading {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px dashed var(--card-border);
+      border-radius: var(--radius);
+    }
+    .loading .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--card-border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 640px) {
+      header.hero { grid-template-columns: 1fr; }
+      .hero-total { text-align: left; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="wrap" id="wrap">
+    <header class="hero">
+      <div>
+        <div class="brand">
+          <div class="brand-icon">T</div>
+          <div>
+            <h1>Token Monitor</h1>
+            <p>多平台 AI 用量实时监控</p>
+          </div>
+        </div>
+      </div>
+      <div class="hero-total">
+        <div class="label">总用量 · <span id="since-label">7d</span></div>
+        <div class="value" id="grand">—</div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="pill-group" id="since-pills">
+        <button type="button" class="pill" data-since="7d">7 天</button>
+        <button type="button" class="pill" data-since="30d">30 天</button>
+        <button type="button" class="pill active" data-since="all">全部</button>
+      </div>
+      <button type="button" class="btn" id="refresh">↻ 刷新</button>
+      <span class="refresh-hint" id="refresh-hint">页面 60 秒刷新 · 后台 5 分钟扫描</span>
+    </div>
+
+    <div id="dashboard-main">
+    <div class="stats-row" id="summary" style="display:none">
+      <div class="stat-chip"><div class="k">平台</div><div class="v" id="stat-platforms">—</div></div>
+      <div class="stat-chip"><div class="k">Sessions</div><div class="v" id="stat-sessions">—</div></div>
+      <div class="stat-chip"><div class="k">Calls</div><div class="v" id="stat-calls">—</div></div>
+      <div class="stat-chip"><div class="k">Input</div><div class="v" id="stat-in">—</div></div>
+      <div class="stat-chip"><div class="k">Output</div><div class="v" id="stat-out">—</div></div>
+    </div>
+
+    <section class="chart-panel" id="chart-panel" style="display:none">
+      <h3>每日 Token 用量趋势</h3>
+      <div class="chart-wrap">
+        <canvas id="daily-chart"></canvas>
+      </div>
+    </section>
+
+    <div class="grid" id="grid">
+      <div class="loading"><div class="spinner"></div>加载中…</div>
+    </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>window.TOKENS_UI={};</script>
+  <script src="/app.js"></script>
+</body>
+</html>

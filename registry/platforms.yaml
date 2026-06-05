@@ -1,0 +1,273 @@
+# Machine-readable platform registry for tokens CLI
+#
+# Path placeholders (expanded on every OS):
+#   %HOME% / %USERPROFILE%  — user home
+#   %APPDATA%              — Windows %APPDATA%; macOS ~/Library/Application Support; Linux ~/.config
+#   %LOCALAPPDATA%         — Windows local app data; Unix ~/.local/share (or XDG_DATA_HOME)
+#   %XDG_CONFIG_HOME%      — Linux/macOS CLI config (~/.config)
+#   %XDG_DATA_HOME%        — Linux/macOS app data (~/.local/share)
+#
+# macOS: include IDE/desktop paths (Cursor, VS Code extensions, Electron apps, Claude Desktop).
+# Linux: prioritize CLI & XDG paths; IDE paths only where desktop ports exist (Cursor, VS Code, Electron).
+
+platforms:
+  - id: claude_code
+    display_name: Claude Code
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/claude-code.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.claude\\projects\\**\\*.jsonl"
+      macos:
+        - "%HOME%/.claude/projects/**/*.jsonl"
+        - "%APPDATA%/Claude/local-agent-mode-sessions/projects/**/*.jsonl"
+        - "%APPDATA%/Claude/local-agent-mode-sessions/**/*.jsonl"
+      linux:
+        - "%HOME%/.claude/projects/**/*.jsonl"
+      env_overrides:
+        - CLAUDE_CONFIG_DIR
+
+  - id: codex
+    display_name: OpenAI Codex CLI
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/codex.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.codex\\sessions\\**\\*.jsonl"
+        - "%USERPROFILE%\\.codex\\archived_sessions\\*.jsonl"
+      macos:
+        - "%HOME%/.codex/sessions/**/*.jsonl"
+        - "%HOME%/.codex/archived_sessions/*.jsonl"
+      linux:
+        - "%HOME%/.codex/sessions/**/*.jsonl"
+        - "%HOME%/.codex/archived_sessions/*.jsonl"
+      env_overrides:
+        - CODEX_HOME
+
+  - id: opencode
+    display_name: OpenCode
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/opencode.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.local\\share\\opencode\\opencode.db"
+        - "%USERPROFILE%\\.local\\share\\opencode\\storage\\message\\**\\*.json"
+      macos:
+        - "%XDG_DATA_HOME%/opencode/opencode.db"
+        - "%XDG_DATA_HOME%/opencode/storage/message/**/*.json"
+        - "%HOME%/.local/share/opencode/opencode.db"
+      linux:
+        - "%XDG_DATA_HOME%/opencode/opencode.db"
+        - "%XDG_DATA_HOME%/opencode/storage/message/**/*.json"
+        - "%HOME%/.local/share/opencode/opencode.db"
+
+  - id: openclaw
+    display_name: OpenClaw
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/openclaw.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.openclaw\\agents\\*\\sessions\\*.jsonl"
+      macos:
+        - "%HOME%/.openclaw/agents/*/sessions/*.jsonl"
+      linux:
+        - "%HOME%/.openclaw/agents/*/sessions/*.jsonl"
+      env_overrides:
+        - OPENCLAW_STATE_DIR
+
+  - id: hermes
+    display_name: Hermes Agent
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/hermes.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.hermes\\state.db"
+      macos:
+        - "%HOME%/.hermes/state.db"
+      linux:
+        - "%HOME%/.hermes/state.db"
+      env_overrides:
+        - HERMES_HOME
+
+  - id: qwen_code
+    display_name: Qwen Code
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/qwen-code.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.qwen\\projects\\**\\*"
+      macos:
+        - "%HOME%/.qwen/projects/**/*"
+      linux:
+        - "%HOME%/.qwen/projects/**/*"
+
+  - id: cline
+    display_name: Cline
+    kind: hybrid
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/cline.md
+    surfaces:
+      - vscode
+      - cli
+    paths:
+      windows:
+        - "%USERPROFILE%\\.cline\\data\\tasks\\*"
+        - "%APPDATA%\\Code\\User\\globalStorage\\saoudrizwan.claude-dev\\tasks\\*"
+      macos:
+        - "%HOME%/.cline/data/tasks/*"
+        - "%APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev/tasks/*"
+      linux:
+        - "%HOME%/.cline/data/tasks/*"
+        - "%XDG_CONFIG_HOME%/Code/User/globalStorage/saoudrizwan.claude-dev/tasks/*"
+      env_overrides:
+        - CLINE_DIR
+
+  - id: kilo_cli
+    display_name: Kilo CLI
+    kind: cli
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/kilo-cli.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.local\\share\\kilo\\kilo.db"
+      macos:
+        - "%XDG_DATA_HOME%/kilo/kilo.db"
+        - "%HOME%/.local/share/kilo/kilo.db"
+      linux:
+        - "%XDG_DATA_HOME%/kilo/kilo.db"
+        - "%HOME%/.local/share/kilo/kilo.db"
+
+  - id: kilo_ide
+    display_name: Kilo (VS Code)
+    kind: ide
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/kilo-ide.md
+    paths:
+      windows:
+        - "%APPDATA%\\Code\\User\\globalStorage\\kilocode.kilo-code\\tasks\\*"
+      macos:
+        - "%APPDATA%/Code/User/globalStorage/kilocode.kilo-code/tasks/*"
+        - "%HOME%/.kilocode/cli/global/tasks/*"
+      linux:
+        - "%XDG_CONFIG_HOME%/Code/User/globalStorage/kilocode.kilo-code/tasks/*"
+        - "%HOME%/.kilocode/cli/global/tasks/*"
+
+  - id: cursor
+    display_name: Cursor
+    kind: ide
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/cursor.md
+    paths:
+      windows:
+        - "%APPDATA%\\Cursor\\User\\globalStorage\\state.vscdb"
+        - "%USERPROFILE%\\.cursor\\projects\\**\\*"
+        - "%USERPROFILE%\\.cursor\\**\\*"
+      macos:
+        - "%APPDATA%/Cursor/User/globalStorage/state.vscdb"
+        - "%HOME%/.cursor/projects/**/*"
+        - "%HOME%/.cursor/**/*"
+      linux:
+        - "%XDG_CONFIG_HOME%/Cursor/User/globalStorage/state.vscdb"
+        - "%HOME%/.cursor/projects/**/*"
+        - "%HOME%/.cursor/**/*"
+    optional_api: cursor_session_token
+
+  - id: cherry_studio
+    display_name: Cherry Studio
+    kind: ide
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/cherry-studio.md
+    paths:
+      windows:
+        - "%APPDATA%\\Cherry Studio\\*"
+        - "%APPDATA%\\cherry-studio\\*"
+      macos:
+        - "%APPDATA%/Cherry Studio/*"
+        - "%APPDATA%/cherry-studio/*"
+      linux:
+        - "%XDG_CONFIG_HOME%/Cherry Studio/*"
+        - "%XDG_CONFIG_HOME%/cherry-studio/*"
+        - "%HOME%/.config/Cherry Studio/*"
+        - "%HOME%/.config/cherry-studio/*"
+
+  - id: chatbox
+    display_name: Chatbox
+    kind: ide
+    status: implemented
+    adapter_version: "1"
+    doc_url: docs/platforms/chatbox.md
+    paths:
+      windows:
+        - "%APPDATA%\\chatbox\\**\\*"
+      macos:
+        - "%APPDATA%/chatbox/**/*"
+      linux:
+        - "%XDG_CONFIG_HOME%/chatbox/**/*"
+        - "%HOME%/.config/chatbox/**/*"
+
+  - id: qoder
+    display_name: Qoder
+    kind: ide
+    status: research
+    adapter_version: "0"
+    doc_url: docs/platforms/qoder.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.lingma\\*"
+        - "%LOCALAPPDATA%\\.lingma\\*"
+      macos:
+        - "%HOME%/.lingma/*"
+        - "%APPDATA%/.lingma/*"
+      linux:
+        - "%HOME%/.lingma/*"
+        - "%XDG_CONFIG_HOME%/.lingma/*"
+
+  - id: qoder_cn
+    display_name: Qoder CN (Lingma)
+    kind: ide
+    status: research
+    adapter_version: "0"
+    doc_url: docs/platforms/qoder-cn.md
+    paths:
+      windows:
+        - "%USERPROFILE%\\.lingma\\*"
+        - "%LOCALAPPDATA%\\.lingma\\*"
+      macos:
+        - "%HOME%/.lingma/*"
+        - "%APPDATA%/.lingma/*"
+      linux:
+        - "%HOME%/.lingma/*"
+        - "%XDG_CONFIG_HOME%/.lingma/*"
+
+  - id: postman
+    display_name: Postman
+    kind: hybrid
+    status: optional_api
+    adapter_version: "1"
+    doc_url: docs/platforms/postman.md
+    optional_api: postman_api_key
+
+  - id: dify
+    display_name: Dify
+    kind: server
+    status: optional_api
+    adapter_version: "1"
+    doc_url: docs/platforms/dify.md
+    optional_api: dify_api_url

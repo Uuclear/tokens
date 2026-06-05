@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tokens · pixel</title>
+  <style>
+    :root {
+      --bg0: #e8e8e0;
+      --bg1: #f0f0e8;
+      --card: #fafaf5;
+      --card-border: #1a1a1a;
+      --text: #0d0d0d;
+      --muted: #3d3d3d;
+      --muted2: #5a5a5a;
+      --accent: #1a1a1a;
+      --green: #0d0d0d;
+      --radius: 0;
+      --shadow: none;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+    body {
+      font-family: "Courier New", Consolas, monospace;
+      background: var(--bg0);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+    .bg-glow { display: none; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+    header.hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 3px solid var(--card-border);
+    }
+    .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem; }
+    .brand-icon {
+      width: 36px; height: 36px;
+      border: 3px solid var(--card-border);
+      background: var(--card);
+      display: grid; place-items: center;
+      font-weight: 700;
+    }
+    .brand h1 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .brand p { color: var(--muted); font-size: 0.75rem; }
+    .hero-total .label { font-size: 0.65rem; text-transform: uppercase; color: var(--muted2); }
+    .hero-total .value { font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+    .pill-group {
+      display: flex; border: 2px solid var(--card-border); background: var(--card); padding: 2px;
+    }
+    .pill {
+      border: none; background: transparent; color: var(--muted);
+      padding: 0.35rem 0.75rem; font: inherit; font-size: 0.8rem; cursor: pointer;
+    }
+    .pill.active { background: var(--card-border); color: var(--card); }
+    .btn {
+      border: 2px solid var(--card-border); background: var(--card);
+      padding: 0.35rem 0.75rem; font: inherit; cursor: pointer;
+    }
+    .refresh-hint { font-size: 0.7rem; color: var(--muted2); margin-left: auto; }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .stat-chip, .card, .chart-panel, .empty, .loading {
+      background: var(--card);
+      border: 2px solid var(--card-border);
+      padding: 0.75rem;
+    }
+    .stat-chip .k { font-size: 0.65rem; text-transform: uppercase; color: var(--muted2); }
+    .stat-chip .v { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .chart-panel { margin-bottom: 1rem; }
+    .chart-panel h3 { font-size: 0.8rem; margin-bottom: 0.5rem; text-transform: uppercase; }
+    .chart-wrap { height: 220px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+    .card-head { display: flex; gap: 0.6rem; margin-bottom: 0.6rem; align-items: flex-start; }
+    .plat-logo, .plat-badge {
+      width: 40px; height: 40px; flex-shrink: 0;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    .plat-logo {
+      object-fit: contain;
+      border: 2px solid var(--card-border);
+      background: var(--card);
+      padding: 2px;
+    }
+    .plat-badge {
+      border: 2px solid;
+      display: grid; place-items: center; font-weight: 700;
+    }
+    .card-head h2 { font-size: 0.95rem; }
+    .card-head .sub { font-size: 0.72rem; color: var(--muted); }
+    .card-total { margin-left: auto; text-align: right; }
+    .card-total .num { font-weight: 700; }
+    .share-bar { height: 6px; border: 1px solid var(--card-border); margin-bottom: 0.5rem; }
+    .share-bar i { display: block; height: 100%; background: var(--card-border); }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; margin-bottom: 0.5rem; }
+    .metric { border: 1px solid var(--card-border); padding: 0.35rem; }
+    .metric .k { font-size: 0.6rem; color: var(--muted2); }
+    .section-title { font-size: 0.65rem; text-transform: uppercase; margin: 0.5rem 0 0.25rem; }
+    .surface-row {
+      display: grid; grid-template-columns: 64px 1fr auto; gap: 0.35rem;
+      font-size: 0.75rem; align-items: center;
+    }
+    .mini-bar { height: 5px; border: 1px solid var(--card-border); }
+    .mini-bar i { display: block; height: 100%; background: var(--card-border); }
+    .model-tag {
+      font-size: 0.68rem; padding: 0.15rem 0.4rem;
+      border: 1px solid var(--card-border); display: inline-block; margin: 0.15rem;
+    }
+    .empty, .loading { grid-column: 1 / -1; text-align: center; padding: 2rem; }
+    .loading .spinner {
+      width: 24px; height: 24px; border: 2px solid var(--card-border);
+      border-top-color: transparent; margin: 0 auto 0.5rem;
+      animation: spin 0.9s steps(8) infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 640px) {
+      header.hero { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <header class="hero">
+      <div class="brand">
+        <div class="brand-icon">T</div>
+        <div>
+          <h1>Token Monitor</h1>
+          <p>PIXEL · 墨水屏友好</p>
+        </div>
+      </div>
+      <div class="hero-total">
+        <div class="label">总用量 · <span id="since-label">全部</span></div>
+        <div class="value" id="grand">—</div>
+      </div>
+    </header>
+    <div class="toolbar">
+      <div class="pill-group" id="since-pills">
+        <button type="button" class="pill" data-since="7d">7D</button>
+        <button type="button" class="pill" data-since="30d">30D</button>
+        <button type="button" class="pill active" data-since="all">ALL</button>
+      </div>
+      <button type="button" class="btn" id="refresh">REFRESH</button>
+      <span class="refresh-hint" id="refresh-hint"></span>
+    </div>
+    <div id="dashboard-main">
+      <div class="stats-row" id="summary" style="display:none">
+        <div class="stat-chip"><div class="k">平台</div><div class="v" id="stat-platforms">—</div></div>
+        <div class="stat-chip"><div class="k">Sessions</div><div class="v" id="stat-sessions">—</div></div>
+        <div class="stat-chip"><div class="k">Calls</div><div class="v" id="stat-calls">—</div></div>
+        <div class="stat-chip"><div class="k">Input</div><div class="v" id="stat-in">—</div></div>
+        <div class="stat-chip"><div class="k">Output</div><div class="v" id="stat-out">—</div></div>
+      </div>
+      <section class="chart-panel" id="chart-panel" style="display:none">
+        <h3>每日趋势</h3>
+        <div class="chart-wrap"><canvas id="daily-chart"></canvas></div>
+      </section>
+      <div class="grid" id="grid"><div class="loading"><div class="spinner"></div>加载中…</div></div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>window.TOKENS_UI={
+    logoClass:'logo-theme-pixel',chartStepped:true,chartPrimary:'#111',chartFill:'transparent',
+    chartTension:0,fillSeries:false,pointRadius:0,borderWidth:2,animMs:0,
+    legendColor:'#333',tickColor:'#444',gridX:'#bbb',gridY:'#ccc',
+    refreshHint:'60s 刷新 · 5min 扫描',chartFont:'monospace'
+  };</script>
+  <script src="/app.js"></script>
+</body>
+</html>
