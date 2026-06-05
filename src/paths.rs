@@ -50,6 +50,10 @@ pub fn expand_path_template(template: &str) -> PathBuf {
     if s.starts_with('~') {
         s = s.replacen('~', home_s.as_ref(), 1);
     }
+    #[cfg(not(windows))]
+    {
+        s = s.replace('\\', "/");
+    }
     PathBuf::from(s)
 }
 
@@ -76,7 +80,7 @@ pub fn codex_home() -> PathBuf {
     }
     env::var("CODEX_HOME")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| expand_path_template("%USERPROFILE%\\.codex"))
+        .unwrap_or_else(|_| expand_path_template("%HOME%/.codex"))
 }
 
 pub fn claude_config_dirs() -> Vec<PathBuf> {
@@ -91,7 +95,7 @@ pub fn claude_config_dirs() -> Vec<PathBuf> {
             }
         }
     }
-    let default = expand_path_template("%USERPROFILE%\\.claude");
+    let default = expand_path_template("%HOME%/.claude");
     if !dirs.iter().any(|d| d == &default) {
         dirs.push(default);
     }
@@ -102,7 +106,7 @@ pub fn openclaw_state_dir() -> PathBuf {
     first_override_or("openclaw", || {
         env::var("OPENCLAW_STATE_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| expand_path_template("%USERPROFILE%\\.openclaw"))
+            .unwrap_or_else(|_| expand_path_template("%HOME%/.openclaw"))
     })
 }
 
@@ -110,7 +114,7 @@ pub fn hermes_home() -> PathBuf {
     first_override_or("hermes", || {
         env::var("HERMES_HOME")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| expand_path_template("%USERPROFILE%\\.hermes"))
+            .unwrap_or_else(|_| expand_path_template("%HOME%/.hermes"))
     })
 }
 
@@ -125,7 +129,7 @@ pub fn opencode_data_dir() -> PathBuf {
     discovery::opencode_data_dirs()
         .into_iter()
         .find(|p| p.exists())
-        .unwrap_or_else(|| expand_path_template("%USERPROFILE%\\.local\\share\\opencode"))
+        .unwrap_or_else(|| expand_path_template("%XDG_DATA_HOME%/opencode"))
 }
 
 pub fn opencode_data_dirs() -> Vec<PathBuf> {
@@ -136,13 +140,13 @@ pub fn cline_data_dir() -> PathBuf {
     first_override_or("cline", || {
         env::var("CLINE_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| expand_path_template("%USERPROFILE%\\.cline\\data"))
+            .unwrap_or_else(|_| expand_path_template("%HOME%/.cline/data"))
     })
 }
 
 pub fn qwen_projects_dir() -> PathBuf {
     first_override_or("qwen_code", || {
-        expand_path_template("%USERPROFILE%\\.qwen\\projects")
+        expand_path_template("%HOME%/.qwen/projects")
     })
 }
 
@@ -176,8 +180,26 @@ mod tests {
 
     #[test]
     fn app_config_uses_xdg_on_linux_paths() {
-        let p = expand_path_template("%APPDATA%/Cursor/User/globalStorage/state.vscdb");
+        let p = expand_path_template("%XDG_CONFIG_HOME%/Cursor/User/globalStorage/state.vscdb");
         let s = p.to_string_lossy();
         assert!(s.contains("Cursor"));
+        assert!(!s.contains('\\'));
+    }
+
+    #[test]
+    fn unix_dot_dirs_use_forward_slashes() {
+        for template in [
+            "%HOME%/.claude",
+            "%HOME%/.codex",
+            "%HOME%/.openclaw",
+            "%HOME%/.hermes",
+            "%HOME%/.cline/data",
+            "%HOME%/.qwen/projects",
+            "%XDG_DATA_HOME%/opencode",
+        ] {
+            let p = expand_path_template(template);
+            let s = p.to_string_lossy();
+            assert!(!s.contains('\\'), "backslash in {template}: {s}");
+        }
     }
 }

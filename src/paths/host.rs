@@ -51,11 +51,26 @@ pub fn first_existing(paths: &[PathBuf]) -> Option<PathBuf> {
 
 /// VS Code / VSCodium `User/globalStorage` root.
 pub fn vscode_global_storage_root() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        return xdg_config_home()
+            .join("Code")
+            .join("User")
+            .join("globalStorage");
+    }
     super::expand_path_template("%APPDATA%/Code/User/globalStorage")
 }
 
 /// Cursor IDE `User/globalStorage/state.vscdb`.
 pub fn cursor_ide_state_db() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        return xdg_config_home()
+            .join("Cursor")
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb");
+    }
     super::expand_path_template("%APPDATA%/Cursor/User/globalStorage/state.vscdb")
 }
 

@@ -60,7 +60,7 @@ impl Adapter for KiloIdeAdapter {
         let mut events = Vec::new();
         for root in [
             vscode_global_storage("kilocode.kilo-code"),
-            expand_path_template("%USERPROFILE%\\.kilocode\\cli\\global\\tasks"),
+            expand_path_template("%HOME%/.kilocode/cli/global/tasks"),
         ] {
             if root.exists() {
                 events.extend(scan_kilo_ide_tasks(&root, ingested_at, filter)?);

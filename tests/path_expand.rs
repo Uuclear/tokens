@@ -41,6 +41,52 @@ fn expand_home_unix_style() {
 }
 
 #[test]
+fn expand_userprofile_dotdir_on_unix() {
+    let p = expand_path_template("%USERPROFILE%\\.claude");
+    let home = host::user_home();
+    assert_eq!(p, home.join(".claude"));
+}
+
+#[test]
+fn registry_linux_paths_expand_without_backslashes() {
+    let reg = PlatformRegistry::load_embedded().unwrap();
+    let home = host::user_home();
+    let home_s = home.to_string_lossy().to_string();
+    for platform in &reg.platforms {
+        let Some(paths) = platform.paths.as_ref() else {
+            continue;
+        };
+        let Some(linux) = paths.linux.as_ref() else {
+            continue;
+        };
+        for template in linux {
+            let p = expand_path_template(strip_glob_for_test(template));
+            let s = p.to_string_lossy().into_owned();
+            assert!(
+                !s.contains('\\'),
+                "{} linux path has backslash: {template} -> {s}",
+                platform.id
+            );
+            assert!(
+                s.starts_with(&home_s)
+                    || s.contains("/.config/")
+                    || s.contains("/.local/share/"),
+                "{} linux path unexpected root: {template} -> {s}",
+                platform.id
+            );
+        }
+    }
+}
+
+fn strip_glob_for_test(template: &str) -> &str {
+    template
+        .split(['*', '?'])
+        .next()
+        .unwrap_or(template)
+        .trim_end_matches(['/', '\\'])
+}
+
+#[test]
 fn linux_cursor_uses_config_not_application_support() {
     let reg = PlatformRegistry::load_embedded().unwrap();
     let cursor = reg.get("cursor").unwrap();
