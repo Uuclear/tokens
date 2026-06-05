@@ -35,6 +35,7 @@ fn expand_xdg_placeholders() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "Unix path separator convention")]
 fn expand_home_unix_style() {
     let p = expand_path_template("%HOME%/.codex/sessions");
     let home = host::user_home();
@@ -42,6 +43,7 @@ fn expand_home_unix_style() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "Unix path separator convention")]
 fn expand_userprofile_dotdir_on_unix() {
     let p = expand_path_template("%USERPROFILE%\\.claude");
     let home = host::user_home();
@@ -49,6 +51,7 @@ fn expand_userprofile_dotdir_on_unix() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "Unix path separator convention")]
 fn registry_linux_paths_expand_without_backslashes() {
     let reg = PlatformRegistry::load_embedded().unwrap();
     let home = host::user_home();

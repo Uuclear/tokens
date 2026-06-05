@@ -187,6 +187,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(windows, ignore = "Unix path separator convention")]
     fn app_config_uses_xdg_on_linux_paths() {
         let p = expand_path_template("%XDG_CONFIG_HOME%/Cursor/User/globalStorage/state.vscdb");
         let s = p.to_string_lossy();
@@ -195,6 +196,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(windows, ignore = "Unix path separator convention")]
     fn unix_dot_dirs_use_forward_slashes() {
         for template in [
             "%HOME%/.claude",
